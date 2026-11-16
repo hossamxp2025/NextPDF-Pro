@@ -88,6 +88,11 @@ __pycache__/
 
 # Output produced from a real bank statement; contains personal data
 docs/evidence/stmt_result.*
+docs/evidence/word-layout/source-page1.png
+docs/evidence/word-layout/word-page1.png
+docs/evidence/word-layout/exe-word-page1.png
+docs/evidence/word-layout/rebuilt.docx
+docs/evidence/word-layout/align.docx
 docs/evidence/_desktop_test.png
 docs/evidence/_diag-*.png
 

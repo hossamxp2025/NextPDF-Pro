@@ -46,7 +46,8 @@
 | التوقيع الرقمي | Not Implemented | |
 | حماية بكلمة مرور | Not Implemented | |
 | Redaction آمن | Not Implemented | |
-| PDF to Word | Not Implemented | |
+| PDF to Word (صور صفحات) | Implemented & Tested | المظهر محفوظ، غير قابل للتحرير |
+| PDF to Word (قابل للتحرير) | Implemented & Tested | 1.5.0: جداول Word حقيقية بعروض أعمدة وتظليل، أسماء خطوط من الخط المضمَّن، ترتيب قراءة RTL، صور في مواضعها. المواضع المطلقة لا تُستنسخ |
 | PDF/A | Not Implemented | |
 | مقارنة ملفين | Not Implemented | |
 | معالجة دُفعية | Not Implemented | |

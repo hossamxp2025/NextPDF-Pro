@@ -55,7 +55,7 @@ class OCRDialog(QDialog):
         if conversion_format in {"docx", "pptx"}:
             self.note.setText(tr("Page images only: appearance preserved, text and tables are not editable."))
         elif conversion_format == "docx_editable":
-            self.note.setText(tr("Editable Word: real text paragraphs with Arabic RTL, approximate layout. Legacy visual Arabic is refused."))
+            self.note.setText(tr("Editable Word: tables, shading, fonts and reading order are rebuilt; absolute positions are not. Legacy visual Arabic is refused."))
         elif conversion_format == "pptx_editable":
             self.note.setText(tr("Editable slides: real positioned text boxes and images, approximate layout. Legacy visual Arabic is refused."))
         elif conversion_format in {"xlsx", "csv"}:

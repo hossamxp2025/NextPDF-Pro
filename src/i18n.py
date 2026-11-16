@@ -29,7 +29,7 @@ TRANSLATIONS = {
         "Editable Word unavailable": "وورد القابل للتحرير غير متاح",
         "Editable Word": "وورد قابل للتحرير",
         "Editable slides": "شرائح قابلة للتحرير",
-        "Editable Word: real text paragraphs with Arabic RTL, approximate layout. Legacy visual Arabic is refused.": "وورد قابل للتحرير: فقرات نصية حقيقية بدعم العربية واتجاه RTL، وتخطيط تقريبي. يُرفض النص العربي المرسوم بصريًا.",
+        "Editable Word: tables, shading, fonts and reading order are rebuilt; absolute positions are not. Legacy visual Arabic is refused.": "وورد قابل للتحرير: تُعاد بناء الجداول والتظليل والخطوط وترتيب القراءة، أما المواضع المطلقة فلا. يُرفض النص العربي المرسوم بصريًا.",
         "Editable slides: real positioned text boxes and images, approximate layout. Legacy visual Arabic is refused.": "شرائح قابلة للتحرير: مربعات نص حقيقية بمواضعها مع الصور، وتخطيط تقريبي. يُرفض النص العربي المرسوم بصريًا.",
         "Page images only: appearance preserved, text and tables are not editable.": "صور صفحات فقط: يُحفظ المظهر، لكن النصوص والجداول ليست قابلة للتحرير.",
         "Only fully ruled rectangular grids are supported. CSV requires one table. Merged cells and scanned tables are unsupported.": "تُدعم الجداول المستطيلة ذات الحدود الكاملة فقط. يتطلب تصدير البيانات جدولًا واحدًا. الخلايا المدمجة والجداول المصورة غير مدعومة.",

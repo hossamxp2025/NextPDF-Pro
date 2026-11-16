@@ -108,6 +108,10 @@ def build_broken_encoding_pdf(path, logical_text, embed_font=True,
     return path
 
 
+HEADER_FILL = (0.11, 0.16, 0.42)
+ROW_FILL = (0.92, 0.92, 0.92)
+
+
 def build_borderless_table_pdf(path):
     """Three-column table with shaded rows and no ruling lines."""
     import pymupdf as fitz
@@ -128,13 +132,70 @@ def build_borderless_table_pdf(path):
         y0 = top + index * line_height
         if index % 2 == 0:
             page.draw_rect(fitz.Rect(30, y0, 560, y0 + line_height),
-                           color=None, fill=(0.92, 0.92, 0.92), width=0)
+                           color=None, fill=ROW_FILL, width=0)
     for column, label in zip(columns, headers):
         page.insert_text((column, top + 19), label, fontsize=12)
     for row_index, row in enumerate(rows, 1):
         for column, value in zip(columns, row):
             page.insert_text((column, top + row_index * line_height + 19),
                              value, fontsize=11)
+    doc.save(path)
+    doc.close()
+    return path
+
+
+# Column order as drawn on the page, left to right.  Logically the table reads
+# right to left, so its first column is the last entry here.
+ARABIC_TABLE_COLUMNS = ("الرصيد", "البيان", "التاريخ")
+ARABIC_TABLE_ROWS = (
+    ("2,927.74", "رصيد أول الفترة", "01-11-2026"),
+    ("2,879.74", "مستشفى", "02-11-2026"),
+    ("1,280.30", "مطعم", "03-11-2026"),
+    ("1,268.70", "وقود", "04-11-2026"),
+)
+
+
+def visual_order(text):
+    """Lay Arabic out right-to-left on the page, as a real producer does.
+
+    MuPDF applies the bidi algorithm when it extracts text, so a run stored
+    left-to-right comes back reversed.  Arabic strings are therefore written in
+    visual order; Latin and digits are stored as they are.
+    """
+    if any(0x0600 <= ord(char) <= 0x06FF for char in text):
+        return text[::-1]
+    return text
+
+
+def build_arabic_borderless_table_pdf(path, font_path=ARABIC_FONT):
+    """Arabic borderless table: shaded header band, no ruling lines.
+
+    Columns are drawn left to right on the page, which is the reverse of how
+    the table reads, so the export has to put the last page column first.
+    """
+    import pymupdf as fitz
+
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=400)
+    font = fitz.Font(fontfile=font_path)
+    columns = [40, 220, 420]
+    top = 60
+    line_height = 30
+    page.draw_rect(fitz.Rect(30, top, 560, top + line_height),
+                   color=None, fill=HEADER_FILL, width=0)
+    for index in range(1, len(ARABIC_TABLE_ROWS) + 1):
+        if index % 2 == 1:
+            y0 = top + index * line_height
+            page.draw_rect(fitz.Rect(30, y0, 560, y0 + line_height),
+                           color=None, fill=ROW_FILL, width=0)
+    writer = fitz.TextWriter(page.rect)
+    for column, label in zip(columns, ARABIC_TABLE_COLUMNS):
+        writer.append((column, top + 20), visual_order(label), font=font, fontsize=12)
+    for row_index, row in enumerate(ARABIC_TABLE_ROWS, 1):
+        for column, value in zip(columns, row):
+            writer.append((column, top + row_index * line_height + 20),
+                          visual_order(value), font=font, fontsize=11)
+    writer.write_text(page)
     doc.save(path)
     doc.close()
     return path

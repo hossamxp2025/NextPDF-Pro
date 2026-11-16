@@ -285,6 +285,75 @@ def _font_family(name):
     return base or "Arial"
 
 
+def _embedded_family(doc, xref):
+    """The family name the embedded font program declares about itself."""
+    try:
+        _name, _ext, _type, data = doc.extract_font(xref)
+    except Exception:
+        return None
+    if not data:
+        return None
+    try:
+        from fontTools.ttLib import TTFont
+        font = TTFont(io.BytesIO(data), lazy=True)
+    except Exception:
+        return None
+    try:
+        records = {}
+        for record in font["name"].names:
+            if record.nameID in (16, 1):
+                try:
+                    text = record.toUnicode().strip()
+                except Exception:
+                    continue
+                if text:
+                    records.setdefault(record.nameID, text)
+        return records.get(16) or records.get(1)
+    except Exception:
+        return None
+    finally:
+        try:
+            font.close()
+        except Exception:
+            pass
+
+
+class _FontNames:
+    """PDF font name -> a family name Word can actually resolve.
+
+    A generator is free to call its fonts ``FontReg`` and ``FontBold``.  Word
+    cannot find such a family, so every run falls back to the default font and
+    the document stops resembling the PDF.  The embedded font program carries
+    its real family name in its own ``name`` table, which is read once per page
+    and used instead.  Nothing is guessed: a font that declares no name, or is
+    not embedded at all, keeps the mapping ``_font_family`` already applied.
+    """
+
+    def __init__(self, doc):
+        self.doc = doc
+        self._pages = {}
+
+    def map_for(self, page):
+        number = page.number
+        if number not in self._pages:
+            mapping = {}
+            for info in page.get_fonts(full=True):
+                basefont = info[3] or ""
+                family = _embedded_family(self.doc, info[0])
+                if family:
+                    mapping[basefont] = family
+                    mapping.setdefault(basefont.split("+")[-1], family)
+            self._pages[number] = mapping
+        return self._pages[number]
+
+    def family(self, page, span_font):
+        if page is not None:
+            resolved = self.map_for(page).get(span_font or "")
+            if resolved:
+                return resolved
+        return _font_family(span_font)
+
+
 def _run_from_span(span, text, font_family=None):
     return {
         "text": text,
@@ -296,10 +365,16 @@ def _run_from_span(span, text, font_family=None):
     }
 
 
-def _line_runs(line, page=None, repair=None):
+def _line_runs(line, page=None, repair=None, names=None):
     spans = [span for span in line.get("spans", []) if span.get("text")]
     if not spans:
         return []
+
+    def family(span):
+        if names is None:
+            return None
+        return names.family(page, span.get("font", ""))
+
     if repair is not None and page is not None:
         fonts = repair.maps_for(page)
         if any(fonts.get(span.get("font", "")) for span in spans):
@@ -308,8 +383,9 @@ def _line_runs(line, page=None, repair=None):
             # repaired once and carried by the dominant span's style.
             text = repair.line_text(page, spans)
             dominant = max(spans, key=lambda span: len(span.get("text", "")))
-            return [_run_from_span(dominant, text)]
-    return [_run_from_span(span, _logical_text(span["text"])) for span in spans]
+            return [_run_from_span(dominant, text, family(dominant))]
+    return [_run_from_span(span, _logical_text(span["text"]), family(span))
+            for span in spans]
 
 
 def _page_lines(page, repair=None):
@@ -344,14 +420,23 @@ def _page_lines(page, repair=None):
 
 
 def _export_editable_docx(doc, pages, target, progress):
-    """Real editable text, one paragraph per PDF line, images appended.
+    """Real editable text with its structure: Word tables, paragraphs, images.
 
-    Layout is approximate: Word reflows text, so this is an editable document,
-    not a page-faithful reproduction. Arabic paragraphs are marked RTL.
+    A detected table becomes a real Word table carrying its column widths, cell
+    shading, fonts, sizes and colours; the page lines it already accounts for
+    are not repeated as paragraphs.  Everything else stays a paragraph, in page
+    order, and an image is placed at the point in that order where it sits on
+    the page.
+
+    Layout is reconstructed, not reproduced: Word reflows text, so absolute
+    positions and overlapping elements are not preserved.  Arabic paragraphs,
+    cells and tables are marked RTL.
     """
     from docx import Document
     from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.section import WD_ORIENT
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
 
@@ -368,43 +453,184 @@ def _export_editable_docx(doc, pages, target, progress):
                 rPr.append(fonts)
             fonts.set(qn("w:cs"), run.font.name or "Arial")
 
+    def tight(paragraph):
+        """PDF lines carry their own spacing; Word must not add more."""
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(1)
+        return paragraph
+
+    def align(paragraph, physical, bidi):
+        """Set a physical edge, allowing for Word mirroring it under ``w:bidi``.
+
+        Measured with Word 16: in a paragraph carrying ``w:bidi``, ``w:jc``
+        right lands against the left margin and left against the right one, so
+        the requested edge is swapped before it is written.
+        """
+        if bidi:
+            physical = {WD_ALIGN_PARAGRAPH.RIGHT: WD_ALIGN_PARAGRAPH.LEFT,
+                        WD_ALIGN_PARAGRAPH.LEFT: WD_ALIGN_PARAGRAPH.RIGHT
+                        }.get(physical, physical)
+        paragraph.alignment = physical
+
+    def style_run(run, data):
+        run.font.name = data["font"]
+        run.font.size = Pt(max(1.0, float(data["size"])))
+        run.bold = bool(data["bold"])
+        run.italic = bool(data["italic"])
+        rgb = int(data["color"])
+        run.font.color.rgb = RGBColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)
+
+    def shading(colour):
+        element = OxmlElement("w:shd")
+        element.set(qn("w:val"), "clear")
+        element.set(qn("w:color"), "auto")
+        element.set(qn("w:fill"), colour)
+        return element
+
+    def shade(cell, colour):
+        cell._tc.get_or_add_tcPr().append(shading(colour))
+
+    def shade_paragraph(paragraph, colour):
+        """Carry the band a line sits on.
+
+        A title printed in white on a dark header band would otherwise be white
+        on white: invisible, and reported by the reader as missing text.
+        """
+        paragraph._p.get_or_add_pPr().append(shading(colour))
+
+    def write_table(rows, page, fills, usable_width):
+        columns = max(len(row) for row in rows)
+        rtl = _rows_are_rtl(rows)
+        # Borderless columns are read left-to-right across the page.  A Word
+        # table marked bidiVisual draws its first column on the right, so an
+        # Arabic table must be written in reversed order to land as it looks.
+        order = list(range(columns))
+        if rtl and rows.borderless:
+            order.reverse()
+        widths = _column_widths(rows.cell_rects, columns, rows.cell_bounds,
+                                usable_width)
+        table = output.add_table(rows=len(rows), cols=columns)
+        table.style = "Table Grid"
+        table.autofit = False
+        margins = OxmlElement("w:tblCellMar")
+        for side in ("left", "right"):
+            element = OxmlElement("w:" + side)
+            element.set(qn("w:w"), "28")  # 1.4pt; Word's 5.4pt default steals width
+            element.set(qn("w:type"), "dxa")
+            margins.append(element)
+        table._tbl.tblPr.append(margins)
+        table.alignment = WD_TABLE_ALIGNMENT.RIGHT if rtl else WD_TABLE_ALIGNMENT.LEFT
+        if rtl:
+            table._tbl.tblPr.append(OxmlElement("w:bidiVisual"))
+        for row_index, values in enumerate(rows):
+            for position, column in enumerate(order):
+                cell = table.cell(row_index, position)
+                text = values[column] if column < len(values) else ""
+                rect = _cell_at(rows.cell_rects, row_index, column)
+                data = _cell_at(rows.cell_styles, row_index, column) or {}
+                paragraph = tight(cell.paragraphs[0])
+                arabic = any(_is_arabic(char) for char in text)
+                if text:
+                    run = paragraph.add_run(text)
+                    style_run(run, {
+                        "font": names.family(page, data.get("font", "")),
+                        "size": data.get("size", 9),
+                        "bold": data.get("bold", False),
+                        "italic": data.get("italic", False),
+                        "color": data.get("color", 0)})
+                    if arabic:
+                        mark_rtl(paragraph, run)
+                paragraph.alignment = (WD_ALIGN_PARAGRAPH.RIGHT if arabic or rtl
+                                       else WD_ALIGN_PARAGRAPH.LEFT)
+                colour = _fill_hex(fills, rect)
+                if colour:
+                    shade(cell, colour)
+                if widths[column]:
+                    cell.width = Pt(widths[column])
+
     output = Document()
     repair = _TextRepair(doc)
-    first_page = True
+    names = _FontNames(doc)
+    first = doc[pages[0] - 1]
+    section = output.sections[0]
+    if first.rect.width > first.rect.height:
+        section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width = Pt(first.rect.width)
+    section.page_height = Pt(first.rect.height)
+    section.left_margin = section.right_margin = Pt(36)
+    section.top_margin = section.bottom_margin = Pt(36)
+    usable_width = float(first.rect.width) - 72.0
     for index, number in enumerate(pages, 1):
         page = doc[number - 1]
-        if not first_page:
+        if index > 1:
             output.add_page_break()
-        first_page = False
-        section = output.sections[-1]
-        section.page_width = Pt(page.rect.width)
-        section.page_height = Pt(page.rect.height)
-        section.left_margin = section.right_margin = Pt(36)
-        section.top_margin = section.bottom_margin = Pt(36)
+        fills = _page_fills(page)
+        try:
+            tables = [table for table in _detected_tables(page, repair)
+                      if table.bbox is not None]
+        except ValueError:
+            # The table reader could not trust this page's encoding.  The line
+            # reader below applies the same check and refuses the export if the
+            # text is unrecoverable, so nothing corrupted is ever written.
+            tables = []
+        items = [(table.bbox.y0, table.bbox.x0, 1, table) for table in tables]
         for line in _page_lines(page, repair):
-            runs = _line_runs(line, page, repair)
-            if not runs:
+            box = fitz.Rect(line["bbox"])
+            centre = fitz.Point((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2)
+            if any(table.bbox.contains(centre) for table in tables):
                 continue
-            paragraph = output.add_paragraph()
-            for data in runs:
-                run = paragraph.add_run(data["text"])
-                run.font.name = data["font"]
-                run.font.size = Pt(data["size"])
-                run.bold = data["bold"]
-                run.italic = data["italic"]
-                rgb = data["color"]
-                run.font.color.rgb = RGBColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)
-            rtl = any(_is_arabic(char) for char in "".join(r["text"] for r in runs))
-            if rtl:
-                mark_rtl(paragraph, paragraph.runs[-1] if paragraph.runs else None)
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            runs = _line_runs(line, page, repair, names)
+            if runs:
+                items.append((box.y0, box.x0, 2, (runs, box)))
         for image in page.get_images(full=True):
             try:
                 info = doc.extract_image(image[0])
+                rects = page.get_image_rects(image[0])
             except (ValueError, RuntimeError):
                 continue
-            if info.get("image"):
-                output.add_picture(io.BytesIO(info["image"]))
+            if not info.get("image"):
+                continue
+            rect = fitz.Rect(rects[0]) if rects else None
+            top = rect.y0 if rect is not None else page.rect.y1
+            left = rect.x0 if rect is not None else 0.0
+            items.append((top, left, 0, (info, rect)))
+        for _top, _left, kind, payload in _reading_order(items):
+            if kind == 1:
+                write_table(payload, page, fills, usable_width)
+                tight(output.add_paragraph())
+            elif kind == 0:
+                info, rect = payload
+                paragraph = tight(output.add_paragraph())
+                if rect is not None:
+                    paragraph.alignment = {
+                        "left": WD_ALIGN_PARAGRAPH.LEFT,
+                        "right": WD_ALIGN_PARAGRAPH.RIGHT,
+                    }.get(_anchor(rect, page.rect), WD_ALIGN_PARAGRAPH.CENTER)
+                    width = Pt(min(rect.width, usable_width))
+                else:
+                    width = Pt(min(120.0, usable_width))
+                paragraph.add_run().add_picture(io.BytesIO(info["image"]), width=width)
+            else:
+                runs, box = payload
+                arabic = any(_is_arabic(char) for char in
+                             "".join(run["text"] for run in runs))
+                paragraph = output.add_paragraph()
+                # w:shd and w:bidi must precede w:spacing and w:jc in w:pPr, so
+                # they are written before python-docx inserts those two.
+                colour = _fill_hex(fills, box)
+                if colour:
+                    shade_paragraph(paragraph, colour)
+                for data in runs:
+                    style_run(paragraph.add_run(data["text"]), data)
+                if arabic:
+                    mark_rtl(paragraph, paragraph.runs[-1] if paragraph.runs else None)
+                tight(paragraph)
+                anchor = _anchor(box, page.rect)
+                edge = {"left": WD_ALIGN_PARAGRAPH.LEFT,
+                        "right": WD_ALIGN_PARAGRAPH.RIGHT}.get(
+                    anchor, WD_ALIGN_PARAGRAPH.RIGHT if arabic
+                    else WD_ALIGN_PARAGRAPH.LEFT)
+                align(paragraph, edge, arabic)
         if progress:
             progress(index, len(pages))
     output.save(target)
@@ -421,6 +647,7 @@ def _export_editable_pptx(doc, pages, target, progress):
     output.slide_width = Pt(doc[pages[0] - 1].rect.width)
     output.slide_height = Pt(doc[pages[0] - 1].rect.height)
     repair = _TextRepair(doc)
+    names = _FontNames(doc)
     for index, number in enumerate(pages, 1):
         page = doc[number - 1]
         slide = output.slides.add_slide(output.slide_layouts[6])
@@ -436,7 +663,7 @@ def _export_editable_pptx(doc, pages, target, progress):
             slide.shapes.add_picture(io.BytesIO(info["image"]), Pt(rect.x0), Pt(rect.y0),
                                      Pt(rect.width), Pt(rect.height))
         for line in _page_lines(page, repair):
-            runs = _line_runs(line, page, repair)
+            runs = _line_runs(line, page, repair, names)
             if not runs:
                 continue
             bbox = line["bbox"]
@@ -498,9 +725,18 @@ class _TableRows(list):
     lines.  Their columns follow reading order left-to-right on the page, so a
     right-to-left table must be reversed before it is written.  A ruled grid is
     drawn where it is read, and its column order is already correct.
+
+    ``bbox``, ``cell_rects`` and ``cell_styles`` carry the geometry and the
+    dominant span style of every cell.  The spreadsheet exports ignore them;
+    the Word export needs them to rebuild column widths, shading and fonts, and
+    to know which page lines the table already accounts for.
     """
 
     borderless = False
+    bbox = None
+    cell_rects = ()
+    cell_styles = ()
+    cell_bounds = ()
 
 
 def _rows_are_rtl(rows):
@@ -621,16 +857,17 @@ def _median(values):
     return (ordered[middle - 1] + ordered[middle]) / 2
 
 
-def _trim_table_rows(rows):
-    """Drop page-summary rows above a borderless table and blank spacer rows.
+def _trim_row_indices(rows):
+    """Indices of the rows that really belong to a borderless table.
 
     Statement generators shade alternating rows, which makes PyMuPDF add an
     empty row between every real row and sometimes fold the page header into the
     grid.  The real table starts at the first row whose cells are all populated;
-    everything above it belongs to the page header.
+    everything above it belongs to the page header.  Indices are returned rather
+    than rows so the parallel geometry and style lists stay aligned.
     """
     if not rows:
-        return rows
+        return []
     width = max(len(row) for row in rows)
     start = 0
     for index, row in enumerate(rows):
@@ -641,7 +878,179 @@ def _trim_table_rows(rows):
         threshold = max(2, int(width * 0.6))
         start = next((index for index, row in enumerate(rows)
                       if sum(1 for value in row if value) >= threshold), 0)
-    return [row for row in rows[start:] if any(value for value in row)]
+    return [index for index in range(start, len(rows))
+            if any(value for value in rows[index])]
+
+
+def _dominant_style(chars):
+    """The style most of a cell's glyphs share, or None for an empty cell."""
+    if not chars:
+        return None
+    counts = {}
+    for char in chars:
+        key = (round(float(char.get("size", 11)), 1), int(char.get("flags", 0)),
+               int(char.get("color", 0)), char.get("font", ""))
+        counts[key] = counts.get(key, 0) + 1
+    (size, flags, colour, font), _ = max(counts.items(), key=lambda item: item[1])
+    return {"size": size, "bold": bool(flags & 16), "italic": bool(flags & 2),
+            "color": colour, "font": font}
+
+
+def _union_rect(cell_rects):
+    union = None
+    for row in cell_rects:
+        for cell in row:
+            if cell is None:
+                continue
+            rect = fitz.Rect(cell)
+            union = rect if union is None else union | rect
+    return union
+
+
+_ROW_TOLERANCE = 3.0
+
+
+def _item_text(item):
+    """Text an export item contributes, for deciding the page direction."""
+    _top, _left, kind, payload = item
+    if kind == 2:
+        return "".join(run["text"] for run in payload[0])
+    if kind == 1:
+        return "".join(value or "" for row in payload for value in row)
+    return ""
+
+
+def _reading_order(items):
+    """Page items in reading order, right-to-left on a predominantly Arabic page.
+
+    Items are ``(top, left, kind, payload)`` with ``kind`` 0 image, 1 table,
+    2 text line.  Side-by-side boxes (summary cards, a label beside its value)
+    share a baseline; sorting them by ``left`` alone puts an Arabic page in
+    reverse, so each band of items within ``_ROW_TOLERANCE`` of one another is
+    ordered right-to-left when the page's own text is mostly Arabic.
+    """
+    arabic = latin = 0
+    for item in items:
+        for char in _item_text(item):
+            if _is_arabic(char):
+                arabic += 1
+            elif char.isalpha():
+                latin += 1
+    rtl = arabic > latin
+    ordered = sorted(items, key=lambda item: (item[0], item[2], item[1]))
+    if not rtl:
+        return ordered
+    result, band = [], []
+    for item in ordered:
+        if band and (item[0] - band[0][0] > _ROW_TOLERANCE or item[2] != band[0][2]):
+            result.extend(sorted(band, key=lambda entry: -entry[1]))
+            band = []
+        band.append(item)
+    result.extend(sorted(band, key=lambda entry: -entry[1]))
+    return result
+
+
+def _anchor(box, page_rect):
+    """Which page edge a block of content is anchored to, or None if it spans.
+
+    A line pinned to one side of the page keeps that side in Word; a line that
+    reaches across the page, or sits in the middle, has no anchor to keep and
+    falls back to the direction of its own script.
+    """
+    third = page_rect.width / 3.0
+    at_left = box.x0 <= page_rect.x0 + third
+    at_right = box.x1 >= page_rect.x1 - third
+    if at_left and not at_right:
+        return "left"
+    if at_right and not at_left:
+        return "right"
+    return None
+
+
+def _cell_at(matrix, row, column):
+    if row >= len(matrix):
+        return None
+    values = matrix[row]
+    return values[column] if column < len(values) else None
+
+
+# Word may not have the PDF's font installed and substitutes a wider one, so a
+# column is never given exactly the width its glyphs occupied on the page.
+SUBSTITUTION_ALLOWANCE = 0.12
+CELL_PADDING = 6.0
+
+
+def _column_widths(cell_rects, column_count, cell_bounds=(), usable_width=None):
+    """Width to give every column in Word, in points.
+
+    Two numbers describe a column: the boundary the detector drew, which sits
+    midway between columns, and the widest glyph run actually inside it.  The
+    boundary can be narrower than its own text (a date column measured at 39pt
+    wraps ``01-11-2026`` onto two lines), so each column is given at least what
+    its content needs, and the table is then fitted to the page by taking space
+    from the columns that have slack above that minimum.
+    """
+    measured, needed = [], []
+    for column in range(column_count):
+        boundaries = [fitz.Rect(row[column]).width for row in cell_rects
+                      if column < len(row) and row[column] is not None]
+        content = [bounds[column][1] - bounds[column][0] for bounds in cell_bounds
+                   if column < len(bounds) and bounds[column] is not None]
+        measured.append(_median(boundaries) if boundaries else 0.0)
+        widest = max(content) if content else 0.0
+        needed.append(widest * (1 + SUBSTITUTION_ALLOWANCE) + CELL_PADDING
+                      if widest else 0.0)
+    widths = [max(pair) for pair in zip(measured, needed)]
+    total = sum(widths)
+    if not usable_width or total <= 0:
+        return widths
+    if total <= usable_width:
+        factor = usable_width / total
+        return [width * factor for width in widths]
+    slack = total - sum(needed)
+    excess = total - usable_width
+    if 0 < excess <= slack:
+        factor = (slack - excess) / slack
+        return [need + (width - need) * factor
+                for width, need in zip(widths, needed)]
+    factor = usable_width / total
+    return [width * factor for width in widths]
+
+
+def _page_fills(page):
+    """Filled rectangles usable as cell shading, smallest first.
+
+    Page-wide bands are skipped: they are the page background or a header
+    stripe, not a cell fill.
+    """
+    page_area = max(1.0, page.rect.width * page.rect.height)
+    fills = []
+    for drawing in page.get_drawings():
+        colour = drawing.get("fill")
+        if not colour or drawing.get("fill_opacity", 1) in (0, None):
+            continue
+        rect = fitz.Rect(drawing["rect"])
+        area = rect.width * rect.height
+        if area <= 0 or area > page_area * 0.6:
+            continue
+        fills.append((area, rect, tuple(float(value) for value in colour)))
+    fills.sort(key=lambda item: item[0])
+    return fills
+
+
+def _fill_hex(fills, rect):
+    """Shading colour under a cell, or None when it is unshaded or white."""
+    if rect is None:
+        return None
+    rect = fitz.Rect(rect)
+    centre = fitz.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
+    for _area, box, colour in fills:
+        if box.contains(centre):
+            if min(colour) > 0.98:
+                return None
+            return "%02X%02X%02X" % tuple(
+                max(0, min(255, int(round(value * 255)))) for value in colour)
+    return None
 
 
 def _gutter_ok(boxes, column_count):
@@ -710,6 +1119,9 @@ def _detected_tables(page, repair=None):
             for span in line["spans"]:
                 for char in span["chars"]:
                     char["font"] = span["font"]
+                    char["size"] = span.get("size", 11)
+                    char["flags"] = span.get("flags", 0)
+                    char["color"] = span.get("color", 0)
                     raw_chars.append(char)
     attempts = (
         {"strategy": "lines", "min_words_vertical": 3},
@@ -743,9 +1155,9 @@ def _detected_tables(page, repair=None):
                             best = (distance, index)
                 return best[1] if best is not None else None
 
-            rows, boxes = [], []
+            rows, boxes, rects, styles, bounds_by_row = [], [], [], [], []
             for row_index, row in enumerate(table.rows):
-                values, bounds = [], []
+                values, bounds, cells, cell_styles = [], [], [], []
                 for cell in row.cells:
                     rect = fitz.Rect(cell)
                     char_rect = rect + (0, -3, 0, 3)
@@ -756,19 +1168,32 @@ def _detected_tables(page, repair=None):
                     values.append(_cell_text(page, chars, rect, repair, fallback=False))
                     bounds.append((min(ch["bbox"][0] for ch in chars),
                                    max(ch["bbox"][2] for ch in chars)) if chars else None)
+                    cells.append(rect)
+                    cell_styles.append(_dominant_style(chars))
                 if any(values):
                     rows.append(values)
                     boxes.append(bounds)
+                    rects.append(cells)
+                    styles.append(cell_styles)
+                    bounds_by_row.append(bounds)
             if len(rows) < (3 if borderless else 2):
                 continue
             if borderless:
                 if not _gutter_ok(boxes, table.col_count):
                     continue
-                rows = _trim_table_rows(rows)
-                if len(rows) < 2:
+                keep = _trim_row_indices(rows)
+                if len(keep) < 2:
                     continue
+                rows = [rows[index] for index in keep]
+                rects = [rects[index] for index in keep]
+                styles = [styles[index] for index in keep]
+                bounds_by_row = [bounds_by_row[index] for index in keep]
             table_rows = _TableRows(rows)
             table_rows.borderless = borderless
+            table_rows.cell_rects = rects
+            table_rows.cell_styles = styles
+            table_rows.cell_bounds = bounds_by_row
+            table_rows.bbox = _union_rect(rects)
             result.append(table_rows)
         if result:
             return result
