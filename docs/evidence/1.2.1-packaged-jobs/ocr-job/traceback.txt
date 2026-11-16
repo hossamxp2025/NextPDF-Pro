@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "src\job_result.py", line 19, in guarded_run
-  File "src\ocr_job.py", line 25, in _run
-  File "json\__init__.py", line 346, in loads
-  File "json\decoder.py", line 338, in decode
-  File "json\decoder.py", line 354, in raw_decode
-json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

@@ -96,3 +96,11 @@ docs/evidence/_*
 # Generated manual-test PDFs
 /test-arabic.pdf
 /test_arabic.pdf
+# Retired local evidence and probes
+/build/_probe_create_report.txt
+/docs/evidence/1.2.1-*/
+/docs/evidence/verify-1.4.1/
+/docs/evidence/selftest-1.4.1.txt
+/docs/evidence/ocr_verified_20261114_211808/
+/docs/evidence/font_3.ttf
+/docs/evidence/font_7.ttf

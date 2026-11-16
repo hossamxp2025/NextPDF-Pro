@@ -118,7 +118,7 @@ docx_editable: "Arabic text uses a damaged visual encoding; editable export woul
 | LICENSE AGPL + THIRD_PARTY_NOTICES + README عربي/إنجليزي + CONTRIBUTING + CHANGELOG + .gitignore | COMPLETE | |
 | مراجعة تراخيص DLLs المضمّنة لـ Tesseract | PARTIAL | الوثيقة نفسها تقول "ليست مراجعة قانونية مكتملة"؛ libicu، libpango، libcairo، libglib ومكتبات LGPL أخرى مضمّنة بلا نصوص تراخيصها |
 | EXE | COMPLETE (OneFile) | 310MB، يعمل، self-test وverify-release ناجحان |
-| مثبّت Inno Setup | COMPLETE | 309MB، أدلة التثبيت والاختصارات في `docs/evidence/1.2.1-*` |
+| مثبّت Inno Setup | COMPLETE | 309MB؛ نتيجة تاريخية للإصدار 1.2.1، أُزيلت أدلته القديمة من التتبع |
 | اختبار جهاز نظيف | غير مُتحقق | مُصرَّح به في CHANGELOG وRELEASE_CHECKLIST |
 
 ---
