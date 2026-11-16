@@ -1,6 +1,6 @@
 # أدلة طبقة النص العربي (الإصدار 1.3.0، 2026-11-16)
 
-السكربتات هنا هي التي بُنيت عليها قرارات `docs/CLAUDE_IMPLEMENTATION_REPORT.md`.
+السكربتات هنا هي التي بُنيت عليها قرارات `docs/internal/CLAUDE_IMPLEMENTATION_REPORT.md`.
 تُشغَّل من جذر المشروع بـ `.venv\Scripts\python.exe -X utf8 <script> [outdir]`
 وتطبع ما تقيسه؛ لا تعدّل شيئًا في المشروع.
 
