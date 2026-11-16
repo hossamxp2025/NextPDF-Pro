@@ -1,0 +1,546 @@
+/*
+ * NextPDF Pro v1.0.2 - Modern Light Theme QSS
+ * واجهة احترافية مشابهة لبرامج الإنتاجية الحديثة (الوضع الفاتح)
+ */
+
+/* =========================================
+   المتغيرات اللونية (تُستبدل بواسطة ThemeManager)
+   ========================================= */
+
+/* ---- النافذة الرئيسية ---- */
+QMainWindow {
+    background-color: {bg_window};
+    color: {text_primary};
+    font-family: "Segoe UI", "Tahoma", "Arial", sans-serif;
+    font-size: 13px;
+}
+
+/* ---- الشريط العلوي (Ribbon) ---- */
+QWidget#ribbonToolbar {
+    background-color: {bg_panel};
+    border-bottom: 2px solid {border_focus};
+    spacing: 4px;
+    padding: 6px 12px;
+}
+
+QWidget#ribbonTabBar {
+    background-color: {bg_panel};
+    border-bottom: 1px solid {border_light};
+}
+
+/* أزرار التبويبات في الشريط العلوي */
+QPushButton#ribbonTabButton {
+    background-color: transparent;
+    color: {text_muted};
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 80px;
+    text-align: center;
+}
+
+QPushButton#ribbonTabButton:hover {
+    color: {text_secondary};
+    background-color: {bg_card};
+    border-radius: 6px 6px 0 0;
+}
+
+QPushButton#ribbonTabButton:checked {
+    color: {primary};
+    background-color: {bg_card};
+    border-bottom: 3px solid {primary};
+    border-radius: 6px 6px 0 0;
+}
+
+/* ---- الأزرار الحديثة ---- */
+QPushButton {
+    background-color: {bg_card};
+    color: {text_primary};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    min-height: 34px;
+    min-width: 60px;
+}
+
+QPushButton:hover {
+    background-color: {bg_hover};
+    border-color: {primary};
+}
+
+QPushButton:pressed {
+    background-color: {primary};
+    color: {text_on_primary};
+    border-color: {primary};
+}
+
+QPushButton:checked {
+    background-color: {primary};
+    color: {text_on_primary};
+    border-color: {primary};
+}
+
+QPushButton:disabled {
+    background-color: {bg_panel};
+    color: {text_disabled};
+    border-color: {border_disabled};
+}
+
+/* زر أساسي (Primary) */
+QPushButton#btnPrimary {
+    background-color: {primary};
+    color: {text_on_primary};
+    border: none;
+}
+
+QPushButton#btnPrimary:hover {
+    background-color: {primary_hover};
+}
+
+QPushButton#btnPrimary:pressed {
+    background-color: {primary_pressed};
+}
+
+/* زر ثانوي (Secondary) */
+QPushButton#btnSecondary {
+    background-color: transparent;
+    color: {text_primary};
+    border: 1px solid {border_light};
+}
+
+QPushButton#btnSecondary:hover {
+    background-color: {bg_hover};
+    border-color: {primary};
+}
+
+/* زر خفيف (Ghost) */
+QPushButton#btnGhost {
+    background-color: transparent;
+    color: {text_secondary};
+    border: none;
+    padding: 4px 12px;
+    min-height: 30px;
+}
+
+QPushButton#btnGhost:hover {
+    background-color: {bg_card};
+    color: {text_primary};
+    border-radius: 4px;
+}
+
+/* أزرار شريط الأدوات (ToolButtons) */
+QToolButton {
+    background-color: {bg_card};
+    color: {text_primary};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    min-height: 32px;
+    min-width: 50px;
+    icon-size: 16px;
+    text-align: center;
+}
+
+QToolButton:hover {
+    background-color: {bg_hover};
+    border-color: {primary};
+}
+
+QToolButton:pressed {
+    background-color: {primary};
+    color: {text_on_primary};
+}
+
+QToolButton:checked {
+    background-color: {primary};
+    color: {text_on_primary};
+    border-color: {primary};
+}
+
+QToolButton:disabled {
+    background-color: {bg_panel};
+    color: {text_disabled};
+    border-color: {border_disabled};
+}
+
+/* ---- اللوحات الجانبية ---- */
+QDockWidget {
+    background-color: {bg_panel};
+    border: none;
+    title-bar-close-icon: url(none);
+    padding: 0;
+}
+
+QDockWidget::title {
+    background-color: {bg_card};
+    color: {text_primary};
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid {border_light};
+    text-align: left;
+}
+
+QDockWidget::close-button {
+    background-color: transparent;
+    border: none;
+    padding: 4px;
+    margin: 2px;
+}
+
+QDockWidget::close-button:hover {
+    background-color: {error};
+    border-radius: 4px;
+}
+
+/* ---- البطاقات ---- */
+QWidget#card {
+    background-color: {bg_card};
+    border: 1px solid {border_light};
+    border-radius: 8px;
+    padding: 12px;
+    margin: 6px;
+}
+
+QWidget#card:hover {
+    border-color: {primary};
+}
+
+QLabel#cardTitle {
+    color: {text_primary};
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+QLabel#cardSubtitle {
+    color: {text_muted};
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+/* ---- قائمة المصغرات ---- */
+QListWidget {
+    background-color: {bg_panel};
+    border: none;
+    border-radius: 0;
+    outline: none;
+    padding: 4px;
+}
+
+QListWidget::item {
+    background-color: {bg_card};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    padding: 4px;
+    margin: 3px;
+    min-height: 80px;
+}
+
+QListWidget::item:selected {
+    background-color: {primary_light};
+    border-color: {primary};
+    color: {text_primary};
+}
+
+QListWidget::item:hover {
+    border-color: {accent};
+    background-color: {bg_hover};
+}
+
+/* ---- لوحة الخصائص ---- */
+QScrollArea {
+    background-color: {bg_panel};
+    border: none;
+}
+
+QWidget#propertiesContainer {
+    background-color: {bg_panel};
+}
+
+QLabel#propLabel {
+    color: {text_muted};
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
+QLabel#propValue {
+    color: {text_primary};
+    font-size: 13px;
+}
+
+/* حقول الإدخال */
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
+    background-color: {bg_input};
+    color: {text_primary};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 34px;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdit:focus {
+    border-color: {primary};
+    background-color: {bg_card};
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+/* مربع اختيار */
+QCheckBox {
+    color: {text_primary};
+    font-size: 13px;
+    spacing: 8px;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid {border_light};
+    border-radius: 4px;
+    background-color: {bg_input};
+}
+
+QCheckBox::indicator:checked {
+    background-color: {primary};
+    border-color: {primary};
+}
+
+/* ---- عارض PDF ---- */
+QWidget#pdfViewer {
+    background-color: {bg_window};
+}
+
+QLabel#pageDisplay {
+    background-color: {bg_panel};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    color: {text_secondary};
+}
+
+/* ---- الحالة الفارغة ---- */
+QWidget#emptyState {
+    background-color: {bg_window};
+    border: none;
+}
+
+QLabel#emptyIcon {
+    font-size: 48px;
+    color: {text_muted};
+    margin-bottom: 16px;
+}
+
+QLabel#emptyTitle {
+    color: {text_primary};
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+QLabel#emptySubtitle {
+    color: {text_muted};
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+/* ---- شريط الحالة ---- */
+QStatusBar {
+    background-color: {bg_panel};
+    color: {text_secondary};
+    border-top: 1px solid {border_light};
+    font-size: 12px;
+    padding: 3px 12px;
+}
+
+QStatusBar QLabel {
+    color: {text_secondary};
+    padding: 2px 8px;
+}
+
+/* ---- شريط القوائم ---- */
+QMenuBar {
+    background-color: {bg_panel};
+    color: {text_primary};
+    border-bottom: 1px solid {border_light};
+    padding: 4px;
+}
+
+QMenuBar::item {
+    background-color: transparent;
+    color: {text_primary};
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+QMenuBar::item:selected {
+    background-color: {bg_card};
+    color: {primary};
+}
+
+QMenu {
+    background-color: {bg_panel};
+    color: {text_primary};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+QMenu::item:selected {
+    background-color: {primary};
+    color: {text_on_primary};
+}
+
+/* ---- التبويبات ---- */
+QTabWidget {
+    background-color: {bg_window};
+}
+
+QTabBar::tab {
+    background-color: {bg_panel};
+    color: {text_muted};
+    padding: 8px 16px;
+    margin-right: 2px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border: 1px solid {border_light};
+    border-bottom: none;
+    min-width: 70px;
+}
+
+QTabBar::tab:selected {
+    background-color: {bg_card};
+    color: {text_primary};
+    border-bottom: 2px solid {primary};
+}
+
+QTabBar::tab:hover {
+    background-color: {bg_hover};
+    color: {text_secondary};
+}
+
+QTabBar::close-button {
+    image: none;
+    border: none;
+    width: 16px;
+    height: 16px;
+    background-color: {text_muted};
+    border-radius: 8px;
+}
+
+QTabBar::close-button:hover {
+    background-color: {error};
+}
+
+/* ---- أشرطة التمرير ---- */
+QScrollBar:vertical {
+    background-color: {bg_panel};
+    width: 12px;
+    border: none;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background-color: {border_light};
+    border-radius: 6px;
+    min-height: 40px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: {text_muted};
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+QScrollBar:horizontal {
+    background-color: {bg_panel};
+    height: 12px;
+    border: none;
+    margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: {border_light};
+    border-radius: 6px;
+    min-width: 40px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: {text_muted};
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0;
+}
+
+/* ---- شريط التقدم ---- */
+QProgressBar {
+    background-color: {bg_card};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    text-align: center;
+    color: {text_primary};
+    font-size: 11px;
+    height: 16px;
+}
+
+QProgressBar::chunk {
+    background-color: {primary};
+    border-radius: 5px;
+}
+
+/* ---- أداة التقسيم ---- */
+QSplitter::handle {
+    background-color: {border_light};
+    width: 2px;
+    height: 2px;
+}
+
+QSplitter::handle:hover {
+    background-color: {primary};
+}
+
+/* ---- دعم RTL ---- */
+QWidget[layoutDirection="RightToLeft"] QTabBar::tab {
+    margin-left: 2px;
+    margin-right: 0;
+}
+
+QWidget[layoutDirection="RightToLeft"] QListWidget::item {
+    text-align: right;
+}
+
+/* ---- الأدوات التوضيحية ---- */
+QToolTip {
+    background-color: {bg_card};
+    color: {text_primary};
+    border: 1px solid {border_light};
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+/* ---- شريط الأدوات في العارض ---- */
+QFrame#zoomBar {
+    background-color: {bg_panel};
+    border-bottom: 1px solid {border_light};
+}

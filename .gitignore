@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+*.egg
+*.egg-info
+*.egg-link
+*.manifest
+installer.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller work directories (build/*.py and installer.iss are sources)
+build/NextPDF-Pro/
+build/pyinstaller_build/
+build/_probe_create/
+build/__pycache__/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+*.log
+logs/
+logs/
+
+# Release artifacts (keep prior releases untouched, don't commit binaries)
+dist/
+NextPDF-Pro-*.zip
+*.exe
+*.msi
+build/version.iss
+build/version_info.txt
+
+# Local user data
+AppData/
+Local/
+data/
+settings.json
+recent.json
+
+# Temporary evidence
+docs/evidence/*.log
+docs/evidence/*.png
+docs/evidence/*.json
+docs/evidence/*.xml
+!docs/evidence/README.md
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Local snapshots and caches
+backup/
+.pytest_cache/
+__pycache__/
+
+# Output produced from a real bank statement; contains personal data
+docs/evidence/stmt_result.*
+docs/evidence/_desktop_test.png
+docs/evidence/_diag-*.png

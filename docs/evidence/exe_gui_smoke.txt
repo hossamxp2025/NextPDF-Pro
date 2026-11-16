@@ -1,0 +1,6 @@
+[PASS] window created - NextPDF Pro 1.1.0 - محرر PDF احترافي
+[PASS] ribbon built
+[PASS] open document
+[PASS] viewer tab - 1
+[PASS] viewer page
+RESULT: PASS

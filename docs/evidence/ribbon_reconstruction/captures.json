@@ -1,0 +1,62 @@
+[
+  {
+    "file": "ribbon_en_1366x768.png",
+    "language": "en",
+    "actual_size": [
+      1366,
+      768
+    ],
+    "platform": "windows",
+    "device_pixel_ratio": 1.0
+  },
+  {
+    "file": "ribbon_en_1920x1080.png",
+    "language": "en",
+    "actual_size": [
+      1920,
+      1061
+    ],
+    "platform": "windows",
+    "device_pixel_ratio": 1.0
+  },
+  {
+    "file": "ribbon_en_2560x1440.png",
+    "language": "en",
+    "actual_size": [
+      2560,
+      1061
+    ],
+    "platform": "windows",
+    "device_pixel_ratio": 1.0
+  },
+  {
+    "file": "ribbon_ar_1366x768.png",
+    "language": "ar",
+    "actual_size": [
+      1366,
+      768
+    ],
+    "platform": "windows",
+    "device_pixel_ratio": 1.0
+  },
+  {
+    "file": "ribbon_ar_1920x1080.png",
+    "language": "ar",
+    "actual_size": [
+      1920,
+      1061
+    ],
+    "platform": "windows",
+    "device_pixel_ratio": 1.0
+  },
+  {
+    "file": "ribbon_ar_2560x1440.png",
+    "language": "ar",
+    "actual_size": [
+      2560,
+      1061
+    ],
+    "platform": "windows",
+    "device_pixel_ratio": 1.0
+  }
+]

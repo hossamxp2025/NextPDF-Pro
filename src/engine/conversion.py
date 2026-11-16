@@ -1,0 +1,874 @@
+"""Explicit, limited PDF exports; source is an immutable document snapshot.
+
+Text exports use the PDF's logical text layer. Shaped presentation-form Arabic
+is refused rather than silently reversed. Image exports preserve appearance;
+HTML is a text reflow, not layout reconstruction. SVG preserves vector layout.
+"""
+import html
+import io
+import json
+import csv
+import re
+import unicodedata
+from pathlib import Path
+import pymupdf as fitz
+from PIL import Image
+
+SUPPORTED = {"png", "jpg", "tiff", "webp", "txt", "html", "md", "svg", "json",
+             "docx", "docx_editable", "pptx", "pptx_editable", "xlsx", "csv"}
+
+ARABIC_RANGES = ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF),
+                 (0xFB50, 0xFDFF), (0xFE70, 0xFEFF))
+
+
+def _is_arabic(char):
+    code = ord(char)
+    return any(start <= code <= end for start, end in ARABIC_RANGES)
+
+
+def _is_presentation_form(text):
+    return any(0xFB50 <= ord(char) <= 0xFDFF or 0xFE70 <= ord(char) <= 0xFEFF
+               for char in text)
+
+
+# Scripts that a plain Arabic/English document never contains.  A PDF whose
+# text layer is a bare glyph-id dump leaks these code points, because the raw
+# CID is returned as if it were Unicode.  Latin-1 accents are excluded so real
+# French/Spanish text is never mistaken for damage.
+_CID_DUMP_RANGES = ((0x0100, 0x024F), (0x0300, 0x036F), (0x0370, 0x03FF),
+                    (0x0400, 0x04FF), (0x0530, 0x058F), (0x0590, 0x05FF),
+                    (0x10A0, 0x10FF))
+_REPLACEMENT_CHAR = 0xFFFD
+
+# Characters whose left-to-right order must survive a visual -> logical flip.
+_LTR_CHARS = frozenset("0123456789"
+                       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                       "abcdefghijklmnopqrstuvwxyz")
+_LTR_INNER = frozenset("-.,/:")
+_MIRRORED = {")": "(", "(": ")", "]": "[", "[": "]", "}": "{", "{": "}",
+             "»": "«", "«": "»"}
+
+
+def _looks_like_cid_dump(text):
+    """True when text is mostly code points no Arabic/English PDF would use."""
+    visible = [char for char in text if char.isprintable() and not char.isspace()]
+    if len(visible) < 4:
+        return False
+    suspicious = 0
+    for char in visible:
+        code = ord(char)
+        if code == _REPLACEMENT_CHAR or any(
+                start <= code <= end for start, end in _CID_DUMP_RANGES):
+            suspicious += 1
+    return suspicious / len(visible) >= 0.30
+
+
+def _visual_line(line):
+    """Flip one stored visual-order line back to logical order.
+
+    Reversing the whole line restores Arabic order, but it also reverses the
+    runs of digits and Latin text that were already left-to-right (a date would
+    become ``6202-11-61``).  Each such run is reversed a second time, and
+    mirrored brackets are corrected.
+    """
+    reversed_line = line[::-1]
+    pieces = []
+    index, length = 0, len(reversed_line)
+    while index < length:
+        if reversed_line[index] in _LTR_CHARS:
+            end = index
+            while end < length and (reversed_line[end] in _LTR_CHARS or (
+                    reversed_line[end] in _LTR_INNER and end + 1 < length
+                    and reversed_line[end + 1] in _LTR_CHARS)):
+                end += 1
+            stop = end
+            while stop > index and reversed_line[stop - 1] in _LTR_INNER:
+                stop -= 1
+            pieces.append(reversed_line[index:stop][::-1])
+            pieces.append(reversed_line[stop:end][::-1])
+            index = end
+        else:
+            pieces.append(reversed_line[index])
+            index += 1
+    flipped = "".join(pieces)
+    return unicodedata.normalize("NFKC", "".join(_MIRRORED.get(c, c) for c in flipped))
+
+
+def _visual_to_logical(text):
+    return "\n".join(_visual_line(line) for line in text.split("\n"))
+
+
+def _gid_to_unicode(font_bytes):
+    """Map glyph id -> Unicode through the embedded font's own cmap."""
+    if not font_bytes:
+        return {}
+    try:
+        from fontTools.ttLib import TTFont
+        font = TTFont(io.BytesIO(font_bytes), lazy=True)
+    except Exception:
+        return {}
+    try:
+        cmap = font.getBestCmap() or {}
+        order = font.getGlyphOrder()
+        gid_of = {name: index for index, name in enumerate(order)}
+        mapping = {}
+        for code, name in cmap.items():
+            gid = gid_of.get(name)
+            if gid is not None and gid not in mapping:
+                mapping[gid] = code
+        return mapping
+    except Exception:
+        return {}
+    finally:
+        try:
+            font.close()
+        except Exception:
+            pass
+
+
+class _TextRepair:
+    """Recover real Unicode from fonts that ship no ToUnicode map.
+
+    A Type0/Identity-H font without /ToUnicode makes a text extractor return
+    ``chr(cid)``.  The CID equals the glyph id, so the embedded font program's
+    cmap turns it back into the original code point.  Nothing is invented: when
+    the font is missing or too many glyphs are unmapped the caller is told, and
+    the export is refused rather than written corrupted.
+    """
+
+    def __init__(self, doc):
+        self.doc = doc
+        self._pages = {}
+
+    def maps_for(self, page):
+        number = page.number
+        if number in self._pages:
+            return self._pages[number]
+        fonts = {}
+        for info in page.get_fonts(full=True):
+            xref, _ext, _type, basefont = info[0], info[1], info[2], info[3]
+            encoding = info[5] if len(info) > 5 else ""
+            if encoding not in ("Identity-H", "Identity-V"):
+                continue
+            try:
+                if "/ToUnicode" in self.doc.xref_object(xref):
+                    continue
+                _name, _ext, _type, font_bytes = self.doc.extract_font(xref)
+            except Exception:
+                continue
+            mapping = _gid_to_unicode(font_bytes)
+            if not mapping:
+                continue
+            fonts[basefont] = mapping
+            fonts.setdefault(basefont.split("+")[-1], mapping)
+        self._pages[number] = fonts
+        return fonts
+
+    def _map(self, page, characters):
+        """characters: iterable of (char, font_name).  Returns text, used, ratio."""
+        fonts = self.maps_for(page)
+        pieces = []
+        used = False
+        total = missing = 0
+        for char, font_name in characters:
+            mapping = fonts.get(font_name or "")
+            if mapping:
+                used = True
+                code = ord(char)
+                if code in mapping:
+                    char = chr(mapping[code])
+                elif char.isprintable() and not char.isspace():
+                    missing += 1
+            if char.isprintable() and not char.isspace():
+                total += 1
+            pieces.append(char)
+        return "".join(pieces), used, (missing / total if total else 0.0)
+
+    def line_text(self, page, spans):
+        """Repair a whole visual-order line; spans may split a single line."""
+        ordered = sorted(spans, key=lambda span: span.get("bbox", [0, 0, 0, 0])[0])
+        fonts = self.maps_for(page)
+        pieces = []
+        used = False
+        total = missing = 0
+        for span in ordered:
+            mapping = fonts.get(span.get("font", ""))
+            for char in span.get("text", ""):
+                code = ord(char)
+                if mapping:
+                    used = True
+                    if code in mapping:
+                        char = chr(mapping[code])
+                    elif char.isprintable() and not char.isspace():
+                        missing += 1
+                if char.isprintable() and not char.isspace():
+                    total += 1
+                pieces.append(char)
+        text = "".join(pieces)
+        if not used:
+            return _logical_text(text)
+        if total and missing / total > 0.10:
+            raise ValueError("This PDF embeds a font without a usable Unicode "
+                             "map; editable export would corrupt the text. "
+                             "Use layout mode.")
+        if any(_is_arabic(char) for char in text) or _is_presentation_form(text):
+            return _visual_to_logical(text)
+        if _looks_like_cid_dump(text):
+            raise ValueError("This PDF has no usable Unicode text map; editable "
+                             "export would corrupt the text. Use layout mode.")
+        return text
+
+    def cell_text(self, page, chars):
+        ordered = sorted(chars, key=lambda ch: (round(ch["origin"][1], 1),
+                                                ch["origin"][0]))
+        lines = {}
+        pieces = []
+        for char in ordered:
+            pieces.append((char["c"], char.get("font", "")))
+        mapped, used, ratio = self._map(page, pieces)
+        if not used:
+            return None
+        if ratio > 0.10:
+            raise ValueError("This PDF embeds a font without a usable Unicode "
+                             "map; table export would corrupt the text. "
+                             "Use layout mode.")
+        index = 0
+        for char in ordered:
+            lines.setdefault(round(char["origin"][1], 1), []).append(mapped[index])
+            index += 1
+        text = "\n".join("".join(group) for _, group in sorted(lines.items()))
+        return _visual_to_logical(text).strip()
+
+
+def _logical_text(text):
+    """Return text that can be re-typed logically, or refuse a damaged layer.
+
+    Proper office PDFs store logical Unicode, which is passed through unchanged.
+    Some generators store shaped Arabic in visual order with a valid ToUnicode
+    map; for a line that is purely Arabic prose, reversing the line restores
+    logical order exactly.  A PDF whose font has no ToUnicode map yields a bare
+    glyph-id dump (Latin Extended, Cyrillic, Hebrew ...) which no amount of
+    reversal can repair, so those lines are refused instead of emitting
+    corrupted text.
+    """
+    cleaned = "".join(char for char in text if ord(char) >= 32 or char in "\n\t")
+    if _looks_like_cid_dump(cleaned):
+        raise ValueError("This PDF has no usable Unicode text map (damaged "
+                         "encoding); editable export would corrupt it. "
+                         "Use layout mode.")
+    if not _is_presentation_form(cleaned):
+        return cleaned
+    # A broken ToUnicode map leaks accented Latin characters into the line.
+    if any(0x80 <= ord(char) <= 0x9F or 0xC0 <= ord(char) <= 0x24F for char in cleaned):
+        raise ValueError("Arabic text uses a damaged visual encoding; "
+                         "editable export would corrupt it. Use layout mode.")
+    normalized = unicodedata.normalize("NFKC", cleaned)
+    if any(char.isascii() and char.isalnum() for char in normalized):
+        raise ValueError("This Arabic line mixes Latin or digits in visual order; "
+                         "editable export would corrupt it. Use layout mode.")
+    logical = "\n".join(line[::-1] for line in normalized.split("\n"))
+    if not any(_is_arabic(char) for char in logical):
+        raise ValueError("Arabic text could not be reconstructed. Use layout mode.")
+    return logical
+
+
+def _font_family(name):
+    base = re.split(r"[-+,]", name or "")[0]
+    if base in {"helv", "Helvetica"}:
+        return "Arial"
+    if base in {"tiro", "Times"}:
+        return "Times New Roman"
+    if base in {"cour", "Courier"}:
+        return "Courier New"
+    if base.startswith("Noto"):
+        return "Segoe UI"
+    return base or "Arial"
+
+
+def _run_from_span(span, text, font_family=None):
+    return {
+        "text": text,
+        "font": font_family or _font_family(span.get("font", "")),
+        "size": round(float(span.get("size", 11)), 1),
+        "bold": bool(span.get("flags", 0) & 16),
+        "italic": bool(span.get("flags", 0) & 2),
+        "color": span.get("color", 0),
+    }
+
+
+def _line_runs(line, page=None, repair=None):
+    spans = [span for span in line.get("spans", []) if span.get("text")]
+    if not spans:
+        return []
+    if repair is not None and page is not None:
+        fonts = repair.maps_for(page)
+        if any(fonts.get(span.get("font", "")) for span in spans):
+            # A visual-order line can be split across spans. Reversing each
+            # span on its own would scramble word order, so the whole line is
+            # repaired once and carried by the dominant span's style.
+            text = repair.line_text(page, spans)
+            dominant = max(spans, key=lambda span: len(span.get("text", "")))
+            return [_run_from_span(dominant, text)]
+    return [_run_from_span(span, _logical_text(span["text"])) for span in spans]
+
+
+def _page_lines(page, repair=None):
+    """Lines of a page; damaged pages join fragments on the same baseline.
+
+    A generator can emit one visual line as several ``line`` objects (a gap
+    between two glyph runs).  Repairing each fragment separately would reverse
+    the word order, so fragments that sit on the same baseline and are
+    horizontally adjacent are joined before the line is repaired.
+    """
+    lines = [line for block in page.get_text("dict")["blocks"]
+             if block.get("type") == 0 for line in block.get("lines", [])]
+    if repair is None or not repair.maps_for(page):
+        return lines
+    lines.sort(key=lambda line: ((line["bbox"][1] + line["bbox"][3]) / 2, line["bbox"][0]))
+    merged = []
+    for line in lines:
+        centre = (line["bbox"][1] + line["bbox"][3]) / 2
+        if merged:
+            last = merged[-1]
+            last_centre = (last["bbox"][1] + last["bbox"][3]) / 2
+            gap = line["bbox"][0] - last["bbox"][2]
+            if abs(last_centre - centre) <= 3 and -2 <= gap <= 24:
+                last["bbox"] = (last["bbox"][0],
+                                min(last["bbox"][1], line["bbox"][1]),
+                                max(last["bbox"][2], line["bbox"][2]),
+                                max(last["bbox"][3], line["bbox"][3]))
+                last["spans"] = last["spans"] + list(line.get("spans", []))
+                continue
+        merged.append({"bbox": tuple(line["bbox"]), "spans": list(line.get("spans", []))})
+    return merged
+
+
+def _export_editable_docx(doc, pages, target, progress):
+    """Real editable text, one paragraph per PDF line, images appended.
+
+    Layout is approximate: Word reflows text, so this is an editable document,
+    not a page-faithful reproduction. Arabic paragraphs are marked RTL.
+    """
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    def mark_rtl(paragraph, run=None):
+        pPr = paragraph._p.get_or_add_pPr()
+        pPr.append(OxmlElement("w:bidi"))
+        if run is not None:
+            rPr = run._element.get_or_add_rPr()
+            rtl = OxmlElement("w:rtl")
+            rPr.append(rtl)
+            fonts = rPr.find(qn("w:rFonts"))
+            if fonts is None:
+                fonts = OxmlElement("w:rFonts")
+                rPr.append(fonts)
+            fonts.set(qn("w:cs"), run.font.name or "Arial")
+
+    output = Document()
+    repair = _TextRepair(doc)
+    first_page = True
+    for index, number in enumerate(pages, 1):
+        page = doc[number - 1]
+        if not first_page:
+            output.add_page_break()
+        first_page = False
+        section = output.sections[-1]
+        section.page_width = Pt(page.rect.width)
+        section.page_height = Pt(page.rect.height)
+        section.left_margin = section.right_margin = Pt(36)
+        section.top_margin = section.bottom_margin = Pt(36)
+        for line in _page_lines(page, repair):
+            runs = _line_runs(line, page, repair)
+            if not runs:
+                continue
+            paragraph = output.add_paragraph()
+            for data in runs:
+                run = paragraph.add_run(data["text"])
+                run.font.name = data["font"]
+                run.font.size = Pt(data["size"])
+                run.bold = data["bold"]
+                run.italic = data["italic"]
+                rgb = data["color"]
+                run.font.color.rgb = RGBColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)
+            rtl = any(_is_arabic(char) for char in "".join(r["text"] for r in runs))
+            if rtl:
+                mark_rtl(paragraph, paragraph.runs[-1] if paragraph.runs else None)
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        for image in page.get_images(full=True):
+            try:
+                info = doc.extract_image(image[0])
+            except (ValueError, RuntimeError):
+                continue
+            if info.get("image"):
+                output.add_picture(io.BytesIO(info["image"]))
+        if progress:
+            progress(index, len(pages))
+    output.save(target)
+
+
+def _export_editable_pptx(doc, pages, target, progress):
+    """One slide per page, each text line a real positioned text box plus images."""
+    from pptx import Presentation
+    from pptx.util import Pt, Emu
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+
+    output = Presentation()
+    output.slide_width = Pt(doc[pages[0] - 1].rect.width)
+    output.slide_height = Pt(doc[pages[0] - 1].rect.height)
+    repair = _TextRepair(doc)
+    for index, number in enumerate(pages, 1):
+        page = doc[number - 1]
+        slide = output.slides.add_slide(output.slide_layouts[6])
+        for image in page.get_images(full=True):
+            try:
+                info = doc.extract_image(image[0])
+                rects = page.get_image_rects(image[0])
+            except (ValueError, RuntimeError):
+                continue
+            if not info.get("image") or not rects:
+                continue
+            rect = rects[0]
+            slide.shapes.add_picture(io.BytesIO(info["image"]), Pt(rect.x0), Pt(rect.y0),
+                                     Pt(rect.width), Pt(rect.height))
+        for line in _page_lines(page, repair):
+            runs = _line_runs(line, page, repair)
+            if not runs:
+                continue
+            bbox = line["bbox"]
+            width = max(24.0, bbox[2] - bbox[0] + 6)
+            height = max(10.0, bbox[3] - bbox[1] + 4)
+            box = slide.shapes.add_textbox(Pt(bbox[0] - 2), Pt(bbox[1] - 2), Pt(width), Pt(height))
+            frame = box.text_frame
+            frame.word_wrap = False
+            frame.margin_left = frame.margin_right = Emu(0)
+            frame.margin_top = frame.margin_bottom = Emu(0)
+            frame.vertical_anchor = MSO_ANCHOR.TOP
+            paragraph = frame.paragraphs[0]
+            rtl = any(_is_arabic(char) for char in "".join(r["text"] for r in runs))
+            if rtl:
+                paragraph._p.get_or_add_pPr().set("rtl", "1")
+                paragraph.alignment = PP_ALIGN.RIGHT
+            for data in runs:
+                run = paragraph.add_run()
+                run.text = data["text"]
+                run.font.size = Pt(data["size"])
+                run.font.bold = data["bold"]
+                run.font.italic = data["italic"]
+                run.font.name = data["font"]
+                rgb = data["color"]
+                run.font.color.rgb = RGBColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)
+        if progress:
+            progress(index, len(pages))
+    output.save(target)
+
+
+def _cell_value(text, typed=True):
+    text = (text or "").strip()
+    if re.fullmatch(r"-?(0|[1-9][0-9]*)(\.[0-9]+)?", text):
+        return float(text) if "." in text else int(text)
+    if re.fullmatch(r"-?[0-9]{1,3}(,[0-9]{3})+(\.[0-9]+)?", text):
+        plain = text.replace(",", "")
+        return float(plain) if "." in plain else int(plain)
+    if typed:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            try:
+                from datetime import date
+                return date.fromisoformat(text)
+            except ValueError:
+                return text
+        match = re.fullmatch(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", text)
+        if match and 1 <= int(match.group(1)) <= 31 and 1 <= int(match.group(2)) <= 12:
+            try:
+                from datetime import date
+                return date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+            except ValueError:
+                return text
+    return text
+
+
+class _TableRows(list):
+    """Rows of one detected table, plus how the table was found.
+
+    ``borderless`` marks tables recovered from aligned text without ruling
+    lines.  Their columns follow reading order left-to-right on the page, so a
+    right-to-left table must be reversed before it is written.  A ruled grid is
+    drawn where it is read, and its column order is already correct.
+    """
+
+    borderless = False
+
+
+def _rows_are_rtl(rows):
+    return any(_is_arabic(char) for row in rows for value in row for char in (value or ""))
+
+
+def _export_tables(doc, pages, target, output_format, progress):
+    repair = _TextRepair(doc)
+    tables = []
+    for i, number in enumerate(pages, 1):
+        page = doc[number - 1]
+        detected = _detected_tables(page, repair)
+        if detected:
+            tables.extend(detected)
+            if progress:
+                progress(i, len(pages))
+            continue
+        xs, ys = set(), set()
+        for drawing in page.get_drawings():
+            for item in drawing["items"]:
+                if item[0] != "l":
+                    continue
+                a, b = item[1], item[2]
+                if abs(a.x - b.x) < 0.1 and abs(a.y - b.y) > 10:
+                    xs.add(round(a.x, 2))
+                if abs(a.y - b.y) < 0.1 and abs(a.x - b.x) > 10:
+                    ys.add(round(a.y, 2))
+        if len(xs) < 3 or len(ys) < 3:
+            continue
+        xs, ys = sorted(xs), sorted(ys)
+        # Supported case: a single fully ruled rectangular grid. Refuse broken
+        # rules and merged cells rather than inferring arbitrary text columns.
+        vertical, horizontal = [], []
+        for drawing in page.get_drawings():
+            for item in drawing["items"]:
+                if item[0] == "l":
+                    a, b = item[1], item[2]
+                    if abs(a.x-b.x) < 0.1:
+                        vertical.append((round(a.x, 2), min(a.y,b.y), max(a.y,b.y)))
+                    if abs(a.y-b.y) < 0.1:
+                        horizontal.append((round(a.y, 2), min(a.x,b.x), max(a.x,b.x)))
+        if not all(any(x == vx and lo <= ys[0]+0.1 and hi >= ys[-1]-0.1 for vx,lo,hi in vertical) for x in xs):
+            continue
+        if not all(any(y == hy and lo <= xs[0]+0.1 and hi >= xs[-1]-0.1 for hy,lo,hi in horizontal) for y in ys):
+            continue
+        raw_chars = []
+        for block in page.get_text("rawdict")["blocks"]:
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line["spans"]:
+                    for char in span["chars"]:
+                        char["font"] = span["font"]
+                        raw_chars.append(char)
+        rows = []
+        for top, bottom in zip(ys, ys[1:]):
+            row = []
+            for left, right in zip(xs, xs[1:]):
+                    rect = fitz.Rect(left, top, right, bottom)
+                    chars = [char for char in raw_chars if rect.contains(
+                        fitz.Point((char["bbox"][0]+char["bbox"][2])/2,
+                                   (char["bbox"][1]+char["bbox"][3])/2))]
+                    row.append(_cell_text(page, chars, rect, repair))
+            rows.append(row)
+        if sum(any(value.strip() for value in row) for row in rows) >= 2:
+            tables.append(rows)
+        if progress:
+            progress(i, len(pages))
+    if not tables:
+        raise ValueError("No supported tables were found")
+    if output_format == "csv":
+        if len(tables) != 1:
+            raise ValueError("CSV requires exactly one supported table")
+        rows = tables[0]
+        if getattr(rows, "borderless", False) and _rows_are_rtl(rows):
+            rows = [list(reversed(row)) for row in rows]
+        with open(target, "w", encoding="utf-8-sig", newline="") as stream:
+            writer = csv.writer(stream)
+            for row in rows:
+                values = [_cell_value(value, typed=False) for value in row]
+                writer.writerow(["'" + value if isinstance(value, str) and value.startswith(("=", "+", "-", "@"))
+                                 else value for value in values])
+        return
+    from openpyxl import Workbook
+    from openpyxl.styles import Border, Side
+    book = Workbook()
+    book.remove(book.active)
+    for index, rows in enumerate(tables, 1):
+        rtl = _rows_are_rtl(rows)
+        if rtl and getattr(rows, "borderless", False):
+            # Borderless columns run left-to-right on the page; a right-to-left
+            # table must be written in logical column order so headers keep
+            # their place.  A ruled grid is already in reading order.
+            rows = [list(reversed(row)) for row in rows]
+        sheet = book.create_sheet(f"Table {index}")
+        sheet.sheet_view.rightToLeft = rtl
+        for r, row in enumerate(rows, 1):
+            for c, text in enumerate(row, 1):
+                value = _cell_value(text)
+                cell = sheet.cell(r, c, value)
+                if isinstance(value, str):
+                    cell.data_type = "s"  # Never interpret PDF text as a formula.
+                elif hasattr(value, "year"):
+                    cell.number_format = ("yyyy-mm-dd" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", (text or "").strip())
+                                          else "dd/mm/yyyy")
+                cell.border = Border(**{side: Side(style="thin") for side in ("left", "right", "top", "bottom")})
+    book.save(target)
+    book.close()
+
+
+def _median(values):
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def _trim_table_rows(rows):
+    """Drop page-summary rows above a borderless table and blank spacer rows.
+
+    Statement generators shade alternating rows, which makes PyMuPDF add an
+    empty row between every real row and sometimes fold the page header into the
+    grid.  The real table starts at the first row whose cells are all populated;
+    everything above it belongs to the page header.
+    """
+    if not rows:
+        return rows
+    width = max(len(row) for row in rows)
+    start = 0
+    for index, row in enumerate(rows):
+        if sum(1 for value in row if value) >= width:
+            start = index
+            break
+    else:
+        threshold = max(2, int(width * 0.6))
+        start = next((index for index, row in enumerate(rows)
+                      if sum(1 for value in row if value) >= threshold), 0)
+    return [row for row in rows[start:] if any(value for value in row)]
+
+
+def _gutter_ok(boxes, column_count):
+    """Reject a borderless guess whose columns overlap on the median row."""
+    gaps = []
+    for column in range(column_count - 1):
+        lefts, rights = [], []
+        for row in boxes:
+            left, right = row[column + 1], row[column]
+            if left is None or right is None:
+                continue
+            lefts.append(left[0])
+            rights.append(right[1])
+        if lefts and rights:
+            gaps.append(_median(lefts) - _median(rights))
+    if not gaps:
+        return False
+    return (_median(gaps) >= 6
+            and sum(1 for gap in gaps if gap > 0) >= len(gaps) * 0.75)
+
+
+def _cell_text(page, chars, rect, repair=None, fallback=True):
+    """Cell text, repairing glyph-id dumps when the font is embedded."""
+    if not chars:
+        if not fallback:
+            return ""
+        text = page.get_textbox(rect).strip()
+        if repair is not None and _looks_like_cid_dump(text):
+            return ""  # sliver cell inside a damaged page; no glyph centre lands here
+        return _logical_text(text)
+    if repair is not None:
+        repaired = repair.cell_text(page, chars)
+        if repaired is not None:
+            return repaired
+    text = page.get_textbox(rect).strip()
+    # Plain Latin grid cells are ordered by baselines and x.  Do not apply this
+    # geometry sort to Arabic logical runs.
+    if not any(_is_arabic(char["c"]) for char in chars):
+        baselines = {}
+        for char in chars:
+            baselines.setdefault(round(char["origin"][1], 1), []).append(char)
+        text = "\n".join(
+            "".join(char["c"] for char in sorted(group,
+                                                 key=lambda ch: ch["origin"][0])).strip()
+            for _, group in sorted(baselines.items()))
+    return _logical_text(text)
+
+
+def _detected_tables(page, repair=None):
+    """Local table regions, not a page-wide Cartesian product of every rule.
+
+    PyMuPDF joins interrupted rules and detects multiple independent tables.
+    Ruled grids are tried first; a borderless statement (shaded rows, aligned
+    columns, no lines) is then read with the text strategy, and finally with
+    text columns over ruled horizontals.  Only rectangular unmerged grids are
+    accepted, and a borderless guess must keep a real median gutter between
+    columns. No OCR cells are invented.
+    """
+    if not page.get_text().strip():
+        return []
+    raw_chars = []
+    for block in page.get_text("rawdict")["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for line in block.get("lines", []):
+            for span in line["spans"]:
+                for char in span["chars"]:
+                    char["font"] = span["font"]
+                    raw_chars.append(char)
+    attempts = (
+        {"strategy": "lines", "min_words_vertical": 3},
+        {"strategy": "text", "min_words_vertical": 3},
+        {"horizontal_strategy": "text", "vertical_strategy": "lines",
+         "min_words_vertical": 3},
+    )
+    for options in attempts:
+        borderless = options.get("strategy") == "text" or "horizontal_strategy" in options
+        try:
+            finder = page.find_tables(use_layout=False, **options)
+        except Exception:
+            continue
+        result = []
+        for table in finder.tables:
+            if table.col_count < 2 or table.row_count < 2:
+                continue
+            if any(cell is None for row in table.rows for cell in row.cells):
+                continue  # merged/missing cell boundaries cannot be reconstructed safely
+            row_rects = [fitz.Rect(row.bbox) for row in table.rows]
+            row_centres = [(rect.y0 + rect.y1) / 2 for rect in row_rects]
+
+            def row_owner(char):
+                """Each glyph belongs to exactly one row, nearest its centre."""
+                cy = (char["bbox"][1] + char["bbox"][3]) / 2
+                best = None
+                for index, (rect, centre) in enumerate(zip(row_rects, row_centres)):
+                    if rect.y0 - 1 <= cy <= rect.y1 + 1:
+                        distance = abs(centre - cy)
+                        if best is None or distance < best[0]:
+                            best = (distance, index)
+                return best[1] if best is not None else None
+
+            rows, boxes = [], []
+            for row_index, row in enumerate(table.rows):
+                values, bounds = [], []
+                for cell in row.cells:
+                    rect = fitz.Rect(cell)
+                    char_rect = rect + (0, -3, 0, 3)
+                    chars = [ch for ch in raw_chars if char_rect.contains(fitz.Point(
+                        (ch["bbox"][0] + ch["bbox"][2]) / 2,
+                        (ch["bbox"][1] + ch["bbox"][3]) / 2))
+                        and row_owner(ch) == row_index]
+                    values.append(_cell_text(page, chars, rect, repair, fallback=False))
+                    bounds.append((min(ch["bbox"][0] for ch in chars),
+                                   max(ch["bbox"][2] for ch in chars)) if chars else None)
+                if any(values):
+                    rows.append(values)
+                    boxes.append(bounds)
+            if len(rows) < (3 if borderless else 2):
+                continue
+            if borderless:
+                if not _gutter_ok(boxes, table.col_count):
+                    continue
+                rows = _trim_table_rows(rows)
+                if len(rows) < 2:
+                    continue
+            table_rows = _TableRows(rows)
+            table_rows.borderless = borderless
+            result.append(table_rows)
+        if result:
+            return result
+    return []
+
+
+def _export_office_images(doc, pages, target, output_format, dpi, progress):
+    """Appearance-only mode: all page content becomes an image, never editable text."""
+    if output_format == "docx":
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.section import WD_SECTION
+        output = Document()
+    else:
+        from pptx import Presentation
+        from pptx.util import Pt
+        output = Presentation()
+        output.slide_width = Pt(doc[pages[0] - 1].rect.width)
+        output.slide_height = Pt(doc[pages[0] - 1].rect.height)
+    for index, number in enumerate(pages, 1):
+        page = doc[number - 1]
+        image = io.BytesIO(page.get_pixmap(dpi=dpi, alpha=False).tobytes("png"))
+        if output_format == "docx":
+            section = output.sections[0] if index == 1 else output.add_section(WD_SECTION.NEW_PAGE)
+            section.page_width, section.page_height = Pt(page.rect.width), Pt(page.rect.height)
+            section.top_margin = section.bottom_margin = section.left_margin = section.right_margin = Pt(12)
+            output.add_picture(image, width=Pt(page.rect.width - 24), height=Pt(page.rect.height - 24))
+        else:
+            slide = output.slides.add_slide(output.slide_layouts[6])
+            scale = min(output.slide_width / page.rect.width, output.slide_height / page.rect.height)
+            width, height = int(page.rect.width * scale), int(page.rect.height * scale)
+            slide.shapes.add_picture(image, int((output.slide_width-width)/2), int((output.slide_height-height)/2), width, height)
+        if progress:
+            progress(index, len(pages))
+    output.save(target)
+
+
+def export_pdf(data, target, pages, output_format, progress=None, dpi=150):
+    if output_format not in SUPPORTED or not 72 <= dpi <= 600:
+        raise ValueError("Unsupported conversion options")
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        if not pages or len(set(pages)) != len(pages) or any(
+            type(n) is not int or not 1 <= n <= doc.page_count for n in pages
+        ):
+            raise ValueError("Invalid page selection")
+        if output_format in {"png", "jpg", "webp", "svg"} and len(pages) != 1:
+            raise ValueError("This output format requires one selected page")
+        if output_format in {"xlsx", "csv"}:
+            _export_tables(doc, pages, target, output_format, progress)
+            return
+        if output_format in {"docx", "pptx"}:
+            _export_office_images(doc, pages, target, output_format, dpi, progress)
+            return
+        if output_format == "docx_editable":
+            _export_editable_docx(doc, pages, target, progress)
+            return
+        if output_format == "pptx_editable":
+            _export_editable_pptx(doc, pages, target, progress)
+            return
+        if output_format in {"png", "jpg", "tiff", "webp"}:
+            images = []
+            for index, number in enumerate(pages, 1):
+                pix = doc[number - 1].get_pixmap(dpi=dpi, alpha=False)
+                images.append(Image.frombytes("RGB", (pix.width, pix.height), pix.samples))
+                if progress:
+                    progress(index, len(pages))
+            try:
+                options = {"quality": 90} if output_format in {"jpg", "webp"} else {}
+                if output_format == "tiff":
+                    options.update(save_all=True, append_images=images[1:], compression="tiff_deflate")
+                images[0].save(target, format={"jpg": "JPEG", "tiff": "TIFF"}.get(output_format, output_format.upper()), **options)
+            finally:
+                for image in images:
+                    image.close()
+            return
+        if output_format == "svg":
+            Path(target).write_text(doc[pages[0] - 1].get_svg_image(), encoding="utf-8")
+            if progress:
+                progress(1, 1)
+            return
+        entries = []
+        for index, number in enumerate(pages, 1):
+            page = doc[number - 1]
+            text = page.get_text()
+            if any("\ufb50" <= ch <= "\ufdff" or "\ufe70" <= ch <= "\ufeff" for ch in text):
+                raise ValueError("Arabic text requires logical OCR before text conversion")
+            if not text.strip():
+                raise ValueError("No text layer; run OCR before text conversion")
+            entries.append({"page": number, "width": page.rect.width,
+                            "height": page.rect.height, "text": text})
+            if progress:
+                progress(index, len(pages))
+        if output_format == "json":
+            result = json.dumps({"mode": "logical-text", "pages": entries}, ensure_ascii=False, indent=2)
+        elif output_format == "html":
+            chunks = []
+            for entry in entries:
+                direction = "rtl" if any("\u0600" <= c <= "\u06ff" for c in entry["text"]) else "ltr"
+                chunks.append(f'<section dir="{direction}"><pre>{html.escape(entry["text"])}</pre></section>')
+            result = '<!doctype html><html><head><meta charset="utf-8"><title>PDF text export</title></head><body>' + "\n".join(chunks) + "</body></html>"
+        else:
+            result = "\n\n".join(entry["text"] for entry in entries)
+        Path(target).write_text(result, encoding="utf-8")

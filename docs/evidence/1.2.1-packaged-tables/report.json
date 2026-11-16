@@ -1,0 +1,26 @@
+[
+  {
+    "layout": "complete",
+    "status": "PASS"
+  },
+  {
+    "layout": "partial",
+    "status": "PASS"
+  },
+  {
+    "layout": "borderless",
+    "status": "PASS"
+  },
+  {
+    "layout": "multiple",
+    "status": "PASS"
+  },
+  {
+    "layout": "pages",
+    "status": "PASS"
+  },
+  {
+    "layout": "unsupported",
+    "status": "PASS"
+  }
+]

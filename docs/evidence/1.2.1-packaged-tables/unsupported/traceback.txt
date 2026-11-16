@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "src\job_result.py", line 19, in guarded_run
+  File "src\conversion_job.py", line 16, in _convert
+  File "src\engine\conversion.py", line 435, in export_pdf
+  File "src\engine\conversion.py", line 305, in _export_tables
+ValueError: No supported tables were found

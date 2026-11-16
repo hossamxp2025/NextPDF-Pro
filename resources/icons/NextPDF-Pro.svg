@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="redBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff4747"/>
+      <stop offset="100%" stop-color="#c60000"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#eef0f3"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#b8860b"/>
+    </linearGradient>
+    <linearGradient id="bluePen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0066cc"/>
+      <stop offset="100%" stop-color="#003366"/>
+    </linearGradient>
+  </defs>
+
+  <!-- خلفية حمراء لامعة بزوايا دائرية كبيرة -->
+  <rect x="6" y="6" width="244" height="244" rx="58" fill="url(#redBg)"/>
+
+  <!-- الزخرفة الذهبية المنحنية حول المستند (شريط ذهبي ملتف) -->
+  <path d="M42 128 Q24 100 126 38 Q232 38 208 140" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round"/>
+  <path d="M126 38 Q232 38 208 140 Q176 212 96 164" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- مستند PDF أبيض مع زاوية مطوية أعلى اليمين -->
+  <path d="M64 34 L190 34 L190 14 L212 36 L228 188 L64 188 Z" fill="url(#paper)" stroke="#c8c8c8" stroke-width="2"/>
+
+  <!-- ظل الطبقة المطوية -->
+  <path d="M190 14 L212 36 L228 188" fill="#d9d9d9"/>
+
+  <!-- خطوط تمثيلية للنص في الجزء العلوي من المستند -->
+  <line x1="82" y1="70" x2="182" y2="70" stroke="#c4c4c4" stroke-width="6" stroke-linecap="round"/>
+  <line x1="82" y1="88" x2="164" y2="88" stroke="#c4c4c4" stroke-width="6" stroke-linecap="round"/>
+  <line x1="82" y1="106" x2="148" y2="106" stroke="#c4c4c4" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- شريط PDF الأحمر في منتصف المستند -->
+  <rect x="72" y="116" width="120" height="48" rx="10" fill="#c60000"/>
+
+  <!-- حروف PDF بيضاء عريضة (مرسومة كمسارات لضمان الظهور بدون خطوط نظام) -->
+  <g fill="#ffffff">
+    <!-- P -->
+    <path d="M104 126 V152 Q104 156 108 158 Q112 160 116 160 L134 160 V126 Z M116 136 Q124 136 128 138 Q132 140 132 144 Q132 148 128 150 Q124 152 116 152 Z"/>
+    <!-- D -->
+    <path d="M144 126 V156 Q144 160 148 164 Q152 168 158 168 Q166 168 172 164 Q176 160 176 156 V126 Z M156 136 Q160 136 164 138 Q168 140 168 144 Q168 148 164 150 Q160 152 156 152 Z"/>
+    <!-- F -->
+    <path d="M184 126 V156 L184 126 Z M184 126 L210 126 M184 142 L202 142"/>
+  </g>
+
+  <!-- خط أحمر رفيع أسفل PDF -->
+  <line x1="92" y1="174" x2="172" y2="174" stroke="#c60000" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- القلم الأزرق مع رأس ذهبي، مائل من الأعلى اليمنى إلى الأسفل اليسرى -->
+  <g transform="translate(184 96) rotate(-40)">
+    <!-- برميل القلم الأزرق -->
+    <rect x="-8" y="-22" width="16" height="64" rx="4" fill="url(#bluePen)" stroke="#002244" stroke-width="1"/>
+    <!-- المرحلة الذهبية أعلى القلم -->
+    <rect x="-8" y="-22" width="16" height="9" rx="3" fill="#d4af37"/>
+    <!-- رأس القلم الذهبي -->
+    <path d="M-4 42 L4 58 L-4 74 Z" fill="#d4af37" stroke="#b8860b" stroke-width="1"/>
+    <!-- نقطة الحبر -->
+    <circle cx="-2" cy="62" r="2.5" fill="#4a2c00"/>
+    <!-- لمعان على القلم -->
+    <path d="M-6 -20 L-2 -16 L-6 -12" fill="none" stroke="#fff8bf" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- شريط Pro الذهبي في الأسفل الأيمن -->
+  <path d="M132 192 Q164 192 174 208 Q194 224 224 220 L232 196 Q204 176 172 172 Z" fill="url(#gold)"/>
+
+  <!-- حروف Pro على الشريط الذهبي (مرسومة كمسارات) -->
+  <g fill="#7a3e00">
+    <!-- P -->
+    <path d="M174 200 V214 Q174 218 178 220 Q182 222 186 222 L196 222 V200 Z M186 208 Q192 208 196 210 Q200 212 200 216 Q200 220 196 222 Q192 224 186 224 Z"/>
+    <!-- r -->
+    <path d="M204 200 V214 Q204 218 208 220 Q212 222 212 222 L212 216 Z M208 208 Q212 208 214 210 Q216 212 216 216"/>
+    <!-- o -->
+    <path d="M220 204 Q224 200 228 204 Q232 208 228 212 Q224 216 220 212 Q216 208 220 204 Z"/>
+  </g>
+</svg>

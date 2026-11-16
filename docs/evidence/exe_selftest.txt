@@ -1,0 +1,9 @@
+[PASS] bundled fonts present - ['NotoNaskhArabic-Regular.ttf', 'NotoSans-Regular.ttf', 'NotoSansArabic-Regular.ttf']
+[PASS] icon present
+[PASS] load PDF
+[PASS] insert Arabic+Latin - Text added successfully
+[PASS] save PDF
+[PASS] font embedded - ['Helvetica', 'Noto Naskh Arabic Regular']
+[PASS] Arabic ink saved - 2 shaped spans
+[PASS] reopen readable
+RESULT: PASS (0 failure(s))

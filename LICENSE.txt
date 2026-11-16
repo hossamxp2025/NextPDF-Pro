@@ -1,0 +1,7 @@
+NextPDF Pro is licensed under the GNU Affero General Public License,
+version 3.0. The complete license is in LICENSE.
+
+NextPDF Pro مرخص بموجب GNU AGPL الإصدار 3.0. النص الكامل في ملف LICENSE.
+
+Third-party components retain their respective licenses; see
+THIRD_PARTY_NOTICES.md and the bundled license texts.
