@@ -27,6 +27,12 @@ NextPDF Pro is a professional, open-source PDF editor for Windows, designed for 
 
 ## Screenshots
 
+### Main window — Arabic
+![Arabic main window with Ribbon and a synthetic test PDF](docs/screenshots/main-ar.png)
+
+### Main window — English
+![English main window with Ribbon and the same test PDF](docs/screenshots/main-en.png)
+
 | About (Arabic) | About (English) |
 |---|---|
 | ![About, Arabic](docs/screenshots/about-ar.png) | ![About, English](docs/screenshots/about-en.png) |
