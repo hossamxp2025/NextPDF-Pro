@@ -14,6 +14,22 @@ NextPDF Pro is a professional, open-source PDF editor for Windows, designed for 
 - **Localization** – Full Arabic/English UI with RTL layout; no mixed labels
 - **Portable OCR, no separate engine** – Recognition runs on the Tesseract compiled into MuPDF, so the release ships only 5 MB of `ara`/`eng` language data instead of a 175 MB Tesseract runtime; no system installation required
 - **Zoom** – Real QSlider zoom (10–800%) synced across views
+- **Damaged text repair** – A PDF whose embedded font has no `ToUnicode` map is repaired from the font's own character map, or refused with a clear message; it is never exported as garbage
+- **Borderless statement tables** – Tables drawn only with shading are detected from text alignment, keep real dates and amounts, and keep Arabic column order
+
+## Screenshots
+
+| About (Arabic) | About (English) |
+|---|---|
+| ![About, Arabic](docs/screenshots/about-ar.png) | ![About, English](docs/screenshots/about-en.png) |
+
+| Terms (Arabic) | Terms (English) |
+|---|---|
+| ![Terms, Arabic](docs/screenshots/terms-ar.png) | ![Terms, English](docs/screenshots/terms-en.png) |
+
+| Installer license page (Arabic) | Installer license page (English) |
+|---|---|
+| ![Setup license, Arabic](docs/screenshots/setup-license-ar.png) | ![Setup license, English](docs/screenshots/setup-license-en.png) |
 
 ## Requirements
 
@@ -25,7 +41,7 @@ NextPDF Pro is a professional, open-source PDF editor for Windows, designed for 
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/hossamxp2025/NextPDF-Pro.git
 cd NextPDF-Pro
 
 # Create and activate a virtual environment

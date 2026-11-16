@@ -12,6 +12,13 @@
 ### الاختبارات
 - **201 اختبارًا ناجحًا، صفر فاشل.** أُضيفت 11 حالة في `tests/test_encoding_and_borderless_tables.py` مع مولّدات PDF صناعية في `tests/pdf_fixtures.py`: خط مضمَّن بلا ToUnicode يُصلَح، خط غائب يُرفض بلا كتابة ملف، وجدول مظلَّل بلا حدود تُقرأ قيمه وتواريخه صحيحة.
 
+### التحقق على البناء المنشور
+- `NextPDF-Pro.exe --self-test`: **PASS** بلا إخفاقات (`docs/evidence/selftest-1.4.2.txt`).
+- `NextPDF-Pro.exe --verify-release`: **32/32 PASS** (`docs/evidence/verify-1.4.2/report.json`).
+- تثبيت الملف `NextPDF-Pro-Setup-1.4.2.exe` فعليًا: نجح، وبصمة الملف المثبَّت تطابق `SHA256SUMS.txt`، ثم **32/32 PASS** من المسار المثبَّت (`docs/evidence/verify-1.4.2-installed/report.json`).
+- لقطات حقيقية لنوافذ «حول» و«الشروط» بالعربية والإنجليزية، ولصفحة الترخيص في المثبّت بالعربية والإنجليزية: `docs/screenshots/`.
+- تقرير الإصدار الكامل: `docs/RELEASE_1.4.2.md`.
+
 ## الإصدار 1.4.0 — تصغير الحزمة
 
 ### التغيير الأساسي
