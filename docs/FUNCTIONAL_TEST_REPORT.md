@@ -20,7 +20,7 @@ two open documents stay isolated.
 | OS | Windows x64 | Windows x64 |
 | Qt platform | `offscreen` for GUI tests | n/a |
 
-Commands were executed from `C:\Users\DELL\NextPDF-Pro` with
+Commands were executed from `<project-root>` with
 `QT_QPA_PLATFORM=offscreen` and `PYTHONIOENCODING=utf-8`.
 
 ---

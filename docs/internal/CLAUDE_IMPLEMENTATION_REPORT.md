@@ -1,6 +1,6 @@
 # تقرير التنفيذ — NextPDF Pro (Claude Code)
 
-المجلد: `C:\Users\DELL\NextPDF-Pro`
+المجلد: `<project-root>`
 الإصدار بعد هذه الجولة: 1.3.0 (Build 20261116-0930)
 المرجع: `docs/CLAUDE_REVIEW_1.2.2.md` (المراجعة المستقلة التي حدّدت العيوب)
 

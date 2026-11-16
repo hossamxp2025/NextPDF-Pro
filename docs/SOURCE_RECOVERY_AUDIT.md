@@ -12,7 +12,7 @@
 
 ## Snapshot and inventory
 
-- Project: `C:\Users\DELL\NextPDF-Pro`.
+- Project: `<project-root>`.
 - Before source edits, copied `src`, `tests`, `resources`, `docs`, `build`, `requirements.txt`, `README.txt`, and `VERSION.txt` into `backup/recovery_snapshot_20261114_163541`. Existing files and releases were not overwritten. This snapshot excludes the Python environments, distribution binaries and user settings stored outside the project.
 - No `.git` entry exists at the project root; Git was not found on PATH or in the checked Program Files and per-user Git paths. Git status, log and reflog are therefore unavailable; no Git operation was attempted.
 - `backup/src_baseline_20261114` is a pre-repair source snapshot. It has no `i18n.py`; its `ui/main_window.py` is 32,614 bytes, timestamp 2026-11-14 13:47:58, and does not contain `_contexts` or `DocumentContext`.
@@ -37,7 +37,7 @@ Recover the per-document window and complete translation source from a trustwort
 ## Subsequent incremental reconstruction
 
 - Saved current source, tests, resources, build files and available user JSON settings in `backup/recovery_source_20261114_163724` before changes.
-- Two older source backups under `C:\Users\DELL\NextPDF-Pro-Backup-v1.0.1-20261114-094850` and `C:\Users\DELL\NextPDF-Pro-Backup-20261114-112504` do not contain the missing document context implementation. They were not copied over the current source.
+- Two older source backups under `<project-root>-Backup-v1.0.1-20261114-094850` and `<project-root>-Backup-20261114-112504` do not contain the missing document context implementation. They were not copied over the current source.
 - Added an initial per-document context, tab switching, independent command stacks, guarded tab close, text commit routing and selected-text deletion. This is a reconstruction, not recovered original 1.1.0 source; remaining close, translation and toolbar behavior requires verification.
 - Added a viewer event-filter lifecycle guard, with a test that failed before the patch and passed after it.
 - Focused verification: `pytest tests/test_acceptance.py::test_09_delete_selected_text_removes_ink tests/test_document_context_lifecycle.py tests/test_viewer_lifecycle.py -q` yielded 3 passed. The context lifecycle test covers opening, switching and closing two documents, not the full range of editing or save behaviors.

@@ -2,7 +2,7 @@
 
 Date: 2026-11-14
 Auditor: automated source inspection + executed baseline tests
-Project root: `C:\Users\DELL\NextPDF-Pro`
+Project root: `<project-root>`
 Python: 3.12.10 (venv: `.venv`, PySide6 6.12.0, PyMuPDF 2.1 / MuPDF 1.28.6)
 
 This audit records what the existing code actually does. A method existing in a
@@ -249,4 +249,3 @@ implemented and verified afterwards:
 
 Baseline failures listed in sections 2–4 must be read as "state before the
 repair"; the current state is recorded in the documents above.
-

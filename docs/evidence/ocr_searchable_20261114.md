@@ -17,7 +17,7 @@ The entries below this section are historical and do not describe the newest imp
 ## Correction after fresh verification
 
 - The earlier claim of six passing OCR tests after adding `Page.set_actual_text` is not supported by the current artifact or a verifiable execution log. The current source does not contain that call. Its historical origin cannot be established from the available evidence.
-- `.venv\Scripts\python.exe`: PyMuPDF 2.1 / MuPDF 1.28.6; module `C:\Users\DELL\NextPDF-Pro\.venv\Lib\site-packages\pymupdf\__init__.py`; engine `C:\Users\DELL\NextPDF-Pro\src\engine\ocr_engine.py`. `hasattr(pymupdf.Page, 'set_actual_text')` is false.
+- `.venv\Scripts\python.exe`: PyMuPDF 2.1 / MuPDF 1.28.6; module `<project-root>\.venv\Lib\site-packages\pymupdf\__init__.py`; engine `<project-root>\src\engine\ocr_engine.py`. `hasattr(pymupdf.Page, 'set_actual_text')` is false.
 - The Arabic integration test invokes `create_searchable_pdf`; monkeypatch changes the Tesseract executable path, not OCR output or the PDF engine. The engine logs exceptions and returns `False`.
 - Restored the fail-closed check and added a regression test that first failed on the unsafe source and now passes. Backup: `backup/ocr_engine_before_rtl_20261114.py`.
 - Fresh focused command: `.venv\Scripts\python.exe -m pytest tests/test_ocr_integration.py -q`: 6 passed, 1 failed. The existing Arabic acceptance test remains failed, not skipped. No correct Arabic searchable output is claimed.
