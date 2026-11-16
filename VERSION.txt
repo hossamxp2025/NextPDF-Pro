@@ -1,5 +1,5 @@
 NextPDF Pro
-Version: 1.4.2
-Build: 20261116-1055
-Status: patch release (English terms dialog; damaged PDF text repair; borderless statement tables)
+Version: 1.5.0
+Build: 20261116-1540
+Status: feature release (Word export rebuilds tables, shading, fonts and reading order)
 Platform: Windows x64

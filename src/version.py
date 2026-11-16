@@ -2,6 +2,6 @@
 
 Version identifies the source line, not feature completeness or release approval.
 """
-APP_VERSION = "1.4.2"
-BUILD_ID = "20261116-1055"
-RELEASE_STATUS = "patch release (English terms dialog; damaged PDF text repair; borderless statement tables)"
+APP_VERSION = "1.5.0"
+BUILD_ID = "20261116-1540"
+RELEASE_STATUS = "feature release (Word export rebuilds tables, shading, fonts and reading order)"
