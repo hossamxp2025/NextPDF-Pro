@@ -1,5 +1,6 @@
 import sys
-sys.path.insert(0, '.')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import settings, LOG_FILE, DATA_DIR, LOG_DIR
 print(f'DATA_DIR: {DATA_DIR}')
 print(f'LOG_DIR: {LOG_DIR}')

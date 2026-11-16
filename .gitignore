@@ -93,3 +93,6 @@ docs/evidence/_diag-*.png
 
 # Local debug scripts (may reference private files)
 docs/evidence/_*
+# Generated manual-test PDFs
+/test-arabic.pdf
+/test_arabic.pdf

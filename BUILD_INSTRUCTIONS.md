@@ -32,13 +32,13 @@ run_app.bat
 ### 3. تشغيل الاختبارات
 
 ```bash
-run_tests.bat
+scripts\run_tests.bat
 ```
 
 ### 4. إنشاء ملف اختبار PDF
 
 ```bash
-create_test_pdf.bat
+scripts\create_test_pdf.bat
 ```
 
 ### 5. بناء ملف EXE المستقل

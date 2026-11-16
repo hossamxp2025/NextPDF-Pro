@@ -1,7 +1,7 @@
 @echo off
 rem NextPDF Pro - full verification: compile check + complete test suite
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 set "PY=python"
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"

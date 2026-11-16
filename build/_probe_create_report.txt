@@ -1,0 +1,18 @@
+﻿a.pdf    pages=2 images=0 chars=23 unchanged=True
+         text: 'HELLO PDF 1\nHELLO PDF 2'
+b.png    pages=1 images=1 chars=0 unchanged=True
+         text: ''
+c.tiff   pages=3 images=3 chars=0 unchanged=True
+         text: ''
+d.txt    pages=1 images=0 chars=24 unchanged=True
+         text: 'ي╗░┼à \x13┼âي║«ي╗ï\xa0ي║«ي╗ي║│\nEnglish\xa0line'
+e.html   pages=1 images=0 chars=12 unchanged=True
+         text: 'Title\nي║\x10┼âي║ثي║«ي╗ث'
+f.csv    pages=1 images=0 chars=23 unchanged=True
+         text: 'Name\nAmount\nINV-1\n15750'
+g.docx   pages=1 images=0 chars=69 unchanged=True
+         text: 'Heading\xa0One\nي║صي║\x10┼â \x12─خي║ث─ب \x0bEي╗ا\xa0ي╗ر─خي║«2─خ 3─ب \xa0ي╗░┼à \x13┼âي║«ي╗ï\nEnglish\xa0paragraph\nA\nB\n1\n2'
+h.xlsx   pages=1 images=0 chars=43 unchanged=True
+         text: '┼â\x13┼à\x12┘«─خي║\x13─بي║\nName\nAmount\nINV-1\n15750\nSecond\nx'
+i.pptx   pages=1 images=0 chars=19 unchanged=True
+         text: 'Slide\xa01\nSlide\xa0Title'

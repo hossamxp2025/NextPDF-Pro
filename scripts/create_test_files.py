@@ -4,6 +4,9 @@
 
 from PIL import Image
 import os
+from pathlib import Path
+
+os.chdir(Path(__file__).resolve().parents[1])
 
 # Create test image for image insertion tests
 img = Image.new('RGB', (200, 150), color='#2563EB')
