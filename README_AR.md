@@ -1,5 +1,13 @@
 # NextPDF Pro
 
+[![Release](https://img.shields.io/github/v/release/hossamxp2025/NextPDF-Pro?color=2563eb)](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/hossamxp2025/NextPDF-Pro/total?color=16a34a)](https://github.com/hossamxp2025/NextPDF-Pro/releases)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-dc2626)](LICENSE)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+
+**[⬇️ تحميل أحدث إصدار](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest)** · [English](README.md)
+
 NextPDF Pro هو محرر PDF احترافي ومفتوح المصدر لنظام ويندوز، مصمم لسير العمل بالعربية والإنجليزية. يجمع بين واجهة شريط علوي حديثة، والتعرف الضوئي على الحروف (OCR) للغة العربية القابلة للبحث، وتحويلات مكتب أوفيس، وإنشاء ودمج ملفات PDF، والثيمات، والتعريب الكامل.
 
 ## الميزات
@@ -14,6 +22,18 @@ NextPDF Pro هو محرر PDF احترافي ومفتوح المصدر لنظا�
 - **التعريب الكامل** – واجهة مستخدم كاملة بالعربية والإنجليزية مع اتجاه RTL؛ بدون خلط لغوي
 - **OCR محمول بلا محرك منفصل** – التعرف يعمل على Tesseract المدمج داخل MuPDF، فالإصدار يحمل 5 ميجابايت من بيانات اللغة (ara وeng) بدل 175 ميجابايت من ملفات Tesseract التنفيذية؛ لا حاجة لتثبيت أي شيء على النظام
 - **التكبير** – شريط انزلاقي حقيقي للتكبير (10–800%) متزامن عبر العروض
+
+## التحميل
+
+نزّل أحدث إصدار من [صفحة الإصدارات](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest):
+
+| الملف | استخدمه لو… |
+|---|---|
+| `NextPDF-Pro-Setup-<version>.exe` | عايز تثبيت عادي مع اختصارات في قائمة ابدأ (مُستحسن) |
+| `NextPDF-Pro.exe` | عايز نسخة محمولة في ملف واحد بدون تثبيت (حوالي 89MB) |
+| `SHA256SUMS.txt` | للتحقق من سلامة الملف: `Get-FileHash .\NextPDF-Pro.exe -Algorithm SHA256` |
+
+> الملفات غير موقّعة رقميًا حتى الآن، فقد يظهر تحذير Windows SmartScreen أول مرة. اختر **مزيد من المعلومات ← التشغيل على أي حال**، أو ابنِ البرنامج من المصدر.
 
 ## المتطلبات
 
@@ -41,7 +61,7 @@ pip install pyinstaller
 # إنشاء بيانات الإصدار
 python build/generate_metadata.py
 
-# بناء الملف التنفيذي المستقل (OneDir)
+# بناء الملف التنفيذي المستقل (ملف واحد)
 python build/build_exe.py
 
 # اختياري: بناء مثبت Inno Setup

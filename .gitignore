@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
@@ -91,3 +90,6 @@ __pycache__/
 docs/evidence/stmt_result.*
 docs/evidence/_desktop_test.png
 docs/evidence/_diag-*.png
+
+# Local debug scripts (may reference private files)
+docs/evidence/_*

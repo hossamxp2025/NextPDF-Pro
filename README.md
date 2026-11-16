@@ -1,5 +1,13 @@
 # NextPDF Pro
 
+[![Release](https://img.shields.io/github/v/release/hossamxp2025/NextPDF-Pro?color=2563eb)](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/hossamxp2025/NextPDF-Pro/total?color=16a34a)](https://github.com/hossamxp2025/NextPDF-Pro/releases)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-dc2626)](LICENSE)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+
+**[⬇️ Download the latest release](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest)** · [العربية](README_AR.md)
+
 NextPDF Pro is a professional, open-source PDF editor for Windows, designed for Arabic/English workflows. It combines a modern Ribbon UI with searchable Arabic OCR, Office conversions, PDF creation/merging, theming, and full localization.
 
 ## Features
@@ -31,6 +39,18 @@ NextPDF Pro is a professional, open-source PDF editor for Windows, designed for 
 |---|---|
 | ![Setup license, Arabic](docs/screenshots/setup-license-ar.png) | ![Setup license, English](docs/screenshots/setup-license-en.png) |
 
+## Download
+
+Get the latest version from the [Releases page](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest):
+
+| File | Use it if… |
+|---|---|
+| `NextPDF-Pro-Setup-<version>.exe` | You want a normal installation with Start-menu shortcuts (recommended) |
+| `NextPDF-Pro.exe` | You want a portable single-file version, no installation (about 89 MB) |
+| `SHA256SUMS.txt` | You want to verify the download: `Get-FileHash .\NextPDF-Pro.exe -Algorithm SHA256` |
+
+> The binaries are not code-signed yet, so Windows SmartScreen may warn on first run. Choose **More info → Run anyway**, or build from source.
+
 ## Requirements
 
 - Windows 10/11 (x64)
@@ -57,7 +77,7 @@ pip install pyinstaller
 # Generate release metadata
 python build/generate_metadata.py
 
-# Build the standalone EXE (OneDir)
+# Build the standalone single-file EXE
 python build/build_exe.py
 
 # Optional: Build the Inno Setup installer
@@ -115,6 +135,6 @@ $env:PYTHONIOENCODING='utf-8'
 
 ## Release Artifacts
 
-- `dist/release-<version>/NextPDF-Pro.exe` – Standalone portable EXE (OneDir)
+- `dist/release-<version>/NextPDF-Pro.exe` – Standalone portable single-file EXE
 - `dist/release-<version>/NextPDF-Pro-Setup-<version>.exe` – Inno Setup installer
 - SHA256 checksums in `SHA256SUMS.txt`

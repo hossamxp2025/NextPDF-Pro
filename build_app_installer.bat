@@ -1,12 +1,12 @@
 @echo off
-rem NextPDF Pro - build the Inno Setup installer from dist\release-1.1.0
+rem NextPDF Pro - build the Inno Setup installer from dist\release-1.4.2
 setlocal
 cd /d "%~dp0"
 
 set "PY=python"
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
 
-if not exist "dist\release-1.1.0\NextPDF-Pro.exe" (
+if not exist "dist\release-1.4.2\NextPDF-Pro.exe" (
     echo [ERROR] Build the EXE first: build_app.bat
     pause
     exit /b 1
@@ -21,6 +21,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo Installer output: dist\release-1.1.0\NextPDF-Pro-Setup-1.1.0.exe
+echo Installer output: dist\release-1.4.2\NextPDF-Pro-Setup-1.4.2.exe
 if "%~1"=="" pause
 endlocal

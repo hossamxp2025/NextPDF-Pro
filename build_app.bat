@@ -22,6 +22,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo Build output: dist\release-1.1.0\NextPDF-Pro.exe
+echo Build output: dist\release-1.4.2\NextPDF-Pro.exe
 if "%~1"=="" pause
 endlocal

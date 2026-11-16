@@ -1,4 +1,4 @@
-NextPDF Pro 1.2.1 - Third-party notices
+NextPDF Pro 1.4.2 - Third-party notices
 
 See THIRD_PARTY_NOTICES.md and licenses/ in the release package.
 Python, Qt/PySide6, PyMuPDF/MuPDF (with Tesseract and Leptonica linked in),
