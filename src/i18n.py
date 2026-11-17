@@ -228,8 +228,51 @@ TRANSLATIONS = {
         "OCR engine is not installed": "محرك التعرف الضوئي غير مثبت",
         "This build does not include Office conversion.": "هذا الإصدار لا يتضمن تحويل Office.",
         "Digital signatures are not implemented.": "التوقيعات الرقمية غير منفذة.",
-        "Encryption and permissions are not implemented.": "التشفير والتصاريح غير منفذة.",
-        "Redaction is not implemented.": "الإخفاء الآمن غير منفذ.",
+        # Protection
+        "Protected file": "ملف محمي",
+        "This file is protected. Enter its password.": "الملف محمي. اكتب كلمة المرور.",
+        "Wrong password, try again": "كلمة المرور غير صحيحة، حاول مرة أخرى",
+        "The file was not opened because the password did not match.":
+            "لم يُفتح الملف لأن كلمة المرور غير مطابقة.",
+        "Protect with a password": "حماية بكلمة مرور",
+        "Remove protection": "إزالة الحماية",
+        "Remove document information": "إزالة بيانات المستند",
+        "Redact text": "إخفاء نص",
+        "Security": "الحماية",
+        "The open password is asked for when the file is opened. The owner "
+        "password is what lifts the restrictions below, so it has to be "
+        "different from the open password.":
+            "كلمة مرور الفتح تُطلب عند فتح الملف. وكلمة مرور المالك هي التي ترفع "
+            "القيود الموجودة بالأسفل، لذلك يجب أن تكون مختلفة عن كلمة مرور الفتح.",
+        "Open password": "كلمة مرور الفتح",
+        "Repeat the open password": "أعد كتابة كلمة مرور الفتح",
+        "Owner password": "كلمة مرور المالك",
+        "Permissions": "الصلاحيات",
+        "Allow printing": "السماح بالطباعة",
+        "Allow copying text": "السماح بنسخ النص",
+        "Allow changing the document": "السماح بتعديل المستند",
+        "Allow comments": "السماح بالتعليقات",
+        "Also remove the document information": "إزالة بيانات المستند أيضًا",
+        "Apply": "تطبيق",
+        "The two open passwords are not the same.":
+            "كلمتا مرور الفتح غير متطابقتين.",
+        "Enter a password, or choose to remove the document information.":
+            "اكتب كلمة مرور، أو اختر إزالة بيانات المستند.",
+        "The owner password has to be different from the open password.":
+            "يجب أن تكون كلمة مرور المالك مختلفة عن كلمة مرور الفتح.",
+        "Restrictions need an owner password, otherwise whoever opens the "
+        "file may do everything.":
+            "القيود تحتاج كلمة مرور مالك، وإلا فمن يفتح الملف يستطيع فعل كل شيء.",
+        "The document is now protected.": "المستند صار محميًا الآن.",
+        "The protection was removed.": "تمت إزالة الحماية.",
+        "The document information was removed.": "تمت إزالة بيانات المستند.",
+        "This document is not protected.": "هذا المستند غير محمي.",
+        "Text to redact": "النص المراد إخفاؤه",
+        "The text will be removed from the file, not covered.":
+            "سيُحذف النص من الملف ولن يُغطّى فقط.",
+        "Nothing matched that text.": "لا يوجد ما يطابق هذا النص.",
+        "Removed areas": "المواضع المحذوفة",
+        "Save the protected file as": "احفظ الملف المحمي باسم",
         # About
         "About NextPDF Pro": "حول NextPDF Pro",
         "Version": "الإصدار",

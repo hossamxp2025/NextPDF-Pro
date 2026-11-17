@@ -221,7 +221,12 @@ class MainWindow(QMainWindow):
         ribbon.add_page("review", "Review", groups=[
             ("Comments", [("Review unavailable", None, "review", False)])])
         ribbon.add_page("protect", "Protect and Sign", groups=[
-            ("Security", [("Protect and Sign unavailable", None, "protect", False)])])
+            ("Security", [
+                ("Protect with a password", self._protect_document, "protect", True),
+                ("Remove protection", self._remove_protection, "protect_remove", True),
+                ("Remove document information", self._strip_document_information,
+                 "metadata_clean", True),
+                ("Redact text", self._redact_text, "redact", True)])])
         ribbon.add_page("view", "View", groups=[
             ("Zoom", [
                 ("Zoom In", self._zoom_in, "view_zoom_in", True),
@@ -557,11 +562,130 @@ class MainWindow(QMainWindow):
             if doc.load(file_path):
                 self._show_document_view(doc, file_path)
                 return True
+            if doc.needs_password:
+                return self._open_protected_file(doc, file_path)
             return False
         except Exception as e:
             logger.error(f"Failed to open file {file_path}: {e}")
             QMessageBox.critical(self, tr("Error"), f"{tr('Failed to open the file')}: {e}")
             return False
+
+    PASSWORD_ATTEMPTS = 3
+
+    def _open_protected_file(self, doc, file_path: str) -> bool:
+        """Ask for the password of an encrypted file and open it.
+
+        The user gets three tries; cancelling at any point leaves the file
+        closed without an error, because cancelling is not a failure.
+        """
+        from PySide6.QtWidgets import QInputDialog, QLineEdit
+
+        tr = get_translator().tr
+        for attempt in range(self.PASSWORD_ATTEMPTS):
+            prompt = (tr("Wrong password, try again") if attempt
+                      else tr("This file is protected. Enter its password."))
+            password, accepted = QInputDialog.getText(
+                self, tr("Protected file"), prompt, QLineEdit.Password)
+            if not accepted:
+                return False
+            if doc.load(file_path, password):
+                self._show_document_view(doc, file_path)
+                return True
+        QMessageBox.warning(
+            self, tr("Protected file"),
+            tr("The file was not opened because the password did not match."))
+        return False
+
+    # ------------------------------------------------------------ protection
+    def _protected_save(self, **save_kwargs) -> bool:
+        """Ask where to write, then save the current document with *kwargs*.
+
+        Protection changes the whole file, so it is always written to a new
+        path: the original stays as it is until the user replaces it.
+        """
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return False
+        suggested = ""
+        if document.file_path:
+            base, ext = os.path.splitext(document.file_path)
+            suggested = f"{base}-protected{ext or '.pdf'}"
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, tr("Save the protected file as"), suggested,
+            f"{tr('PDF files')} (*.pdf)")
+        if not file_path:
+            return False
+        if not document.save(file_path, **save_kwargs):
+            QMessageBox.critical(self, tr("Error"),
+                                 f"{tr('Failed to save the file')}: "
+                                 f"{document.last_error or ''}")
+            return False
+        self._update_window_title()
+        return True
+
+    def _protect_document(self):
+        """Encrypt the open document and set its permissions."""
+        from src.ui.protect_dialog import ProtectDialog
+
+        tr = get_translator().tr
+        if self.current_document is None:
+            return
+        dialog = ProtectDialog(self, was_protected=self.current_document.is_encrypted)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        if self._protected_save(**dialog.save_arguments()):
+            self.status_label.setText(tr("The document is now protected."))
+
+    def _remove_protection(self):
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return
+        if not document.is_encrypted:
+            QMessageBox.information(self, tr("Protected file"),
+                                    tr("This document is not protected."))
+            return
+        if self._protected_save(remove_encryption=True):
+            self.status_label.setText(tr("The protection was removed."))
+
+    def _strip_document_information(self):
+        tr = get_translator().tr
+        if self.current_document is None:
+            return
+        if self._protected_save(strip_metadata=True):
+            self.status_label.setText(tr("The document information was removed."))
+
+    def _redact_text(self):
+        """Remove every occurrence of a phrase from the open document."""
+        from PySide6.QtWidgets import QInputDialog
+
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return
+        needle, accepted = QInputDialog.getText(
+            self, tr("Redact text"),
+            f"{tr('Text to redact')}\n{tr('The text will be removed from the file, not covered.')}")
+        if not accepted or not needle.strip():
+            return
+        removed = document.redact_text(needle)
+        if not removed:
+            QMessageBox.information(self, tr("Redact text"),
+                                    tr("Nothing matched that text."))
+            return
+        self._refresh_current_view()
+        self.status_label.setText(f"{tr('Removed areas')}: {removed}")
+
+    def _refresh_current_view(self):
+        """Redraw the viewer after the page content changed underneath it."""
+        viewer = getattr(self.current_context, "viewer", None)
+        if viewer is None:
+            return
+        try:
+            viewer.refresh_current_page()
+        except Exception:
+            logger.debug("Viewer refresh failed", exc_info=True)
 
     def _save_file(self):
         """حفظ المستند الحالي."""
