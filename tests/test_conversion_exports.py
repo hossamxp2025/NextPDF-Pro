@@ -41,14 +41,14 @@ def test_exports_arabic_and_english_with_source_unchanged(tmp_path, output_forma
             assert 'dir="rtl"' in result
 
 
-def test_rejects_multiple_pages_for_single_page_image_without_writing(tmp_path):
+def test_rejects_multiple_pages_for_svg_without_writing(tmp_path):
     with fitz.open() as doc:
         doc.new_page()
         doc.new_page()
         data = doc.tobytes()
-    target = tmp_path / "image.png"
+    target = tmp_path / "image.svg"
     with pytest.raises(ValueError):
-        export_pdf(data, str(target), [1, 2], "png")
+        export_pdf(data, str(target), [1, 2], "svg")
     assert not target.exists()
 
 

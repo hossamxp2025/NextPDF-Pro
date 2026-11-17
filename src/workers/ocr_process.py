@@ -35,29 +35,34 @@ class OCRProcess(QObject):
     def is_running(self):
         return self.process.state() != QProcess.NotRunning
 
-    def start(self, pdf_bytes, target, language, pages, output_format):
+    def start(self, pdf_bytes, target, language, pages, output_format, dpi=150):
         if self.is_running() or self._temp is not None:
             raise RuntimeError("OCR process is already active")
         try:
-            self._start(pdf_bytes, target, language, pages, output_format)
+            self._start(pdf_bytes, target, language, pages, output_format, dpi)
         except Exception:
             logger.exception("Cannot prepare child job")
             self._cleanup()
             raise
 
-    def _start(self, pdf_bytes, target, language, pages, output_format):
+    def _start(self, pdf_bytes, target, language, pages, output_format, dpi=150):
         if language not in {"ara", "eng", "ara+eng"} or output_format not in self.formats:
+            raise ValueError("Invalid OCR options")
+        if not 72 <= int(dpi) <= 600:
             raise ValueError("Invalid OCR options")
         self._target = os.path.abspath(target)
         # Stage on the destination filesystem so publishing is an atomic rename.
         self._temp = tempfile.TemporaryDirectory(prefix=".nextpdf_job_", dir=str(Path(target).resolve().parent))
         self._directory = Path(self._temp.name)
         self._format = output_format
+        self.published_files = ()
         self._cancelled = False
         self._buffer = b""
         (self._directory / "input.pdf").write_bytes(pdf_bytes)
         request = self._directory / "request.json"
-        request.write_text(json.dumps({"language": language, "pages": pages, "format": output_format}), encoding="utf-8")
+        request.write_text(json.dumps({"language": language, "pages": pages,
+                                       "format": output_format, "dpi": int(dpi)}),
+                           encoding="utf-8")
         self.process.setWorkingDirectory(str(Path(__file__).resolve().parents[2]))
         self.process.setProgram(sys.executable)
         self.process.setArguments(([self.cli_flag] if getattr(sys, "frozen", False)
@@ -129,7 +134,12 @@ class OCRProcess(QObject):
 
     def _publish_output(self):
         output = self._directory / ("output." + self._format)
-        if not output.is_file() or output.stat().st_size == 0:
+        if not output.is_file():
+            # Several pages of PNG, JPEG or WEBP cannot share one file, so the
+            # child wrote one numbered file per page.  Publish them all.
+            self._publish_page_images()
+            return
+        if output.stat().st_size == 0:
             raise ValueError("Missing output")
         if self._format == "xlsx":
             from openpyxl import load_workbook
@@ -140,6 +150,23 @@ class OCRProcess(QObject):
             finally:
                 book.close()
         os.replace(output, self._target)
+
+    def _publish_page_images(self):
+        from src.engine.conversion import page_image_path
+
+        parts = sorted(self._directory.glob(f"output-*.{self._format}"))
+        if not parts or any(part.stat().st_size == 0 for part in parts):
+            raise ValueError("Missing output")
+        published = []
+        for index, part in enumerate(parts, 1):
+            destination = page_image_path(self._target, index, len(parts))
+            os.replace(part, destination)
+            published.append(destination)
+        self.published_files = published
+        self._target = published[0]
+
+    #: The files the last finished job published (one per page for images).
+    published_files = ()
 
     def _cleanup(self):
         if self._temp:

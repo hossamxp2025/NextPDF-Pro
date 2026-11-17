@@ -1231,15 +1231,247 @@ def _export_office_images(doc, pages, target, output_format, dpi, progress):
     output.save(target)
 
 
-def export_pdf(data, target, pages, output_format, progress=None, dpi=150):
+def page_image_path(target, position: int, total: int) -> str:
+    """Where page *position* (1-based within the selection) is written.
+
+    One selected page keeps the name the user chose.  Several pages cannot
+    share one PNG, JPEG or WEBP file, so each gets a numbered name beside it:
+    ``report.png`` becomes ``report-001.png``, ``report-002.png`` and so on.
+    """
+    path = Path(target)
+    if total <= 1:
+        return str(path)
+    return str(path.with_name(f"{path.stem}-{position:03d}{path.suffix}"))
+
+
+def _export_images(doc, pages, target, output_format, dpi, progress):
+    """Render the selected pages to raster images.
+
+    TIFF holds every page in one file.  The other raster formats hold one
+    page each, so a selection of several pages writes several files and the
+    caller is told how many by the returned list.
+    """
+    written = []
+    pillow_format = {"jpg": "JPEG", "tiff": "TIFF"}.get(
+        output_format, output_format.upper())
+    options = {"quality": 90} if output_format in {"jpg", "webp"} else {}
+    images = []
+    try:
+        for index, number in enumerate(pages, 1):
+            pix = doc[number - 1].get_pixmap(dpi=dpi, alpha=False)
+            image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            if output_format == "tiff":
+                images.append(image)
+            else:
+                path = page_image_path(target, index, len(pages))
+                image.save(path, format=pillow_format, **options)
+                image.close()
+                written.append(path)
+            if progress:
+                progress(index, len(pages))
+        if output_format == "tiff":
+            if len(images) > 1:
+                options.update(save_all=True, append_images=images[1:],
+                               compression="tiff_deflate")
+            images[0].save(target, format=pillow_format, **options)
+            written.append(str(target))
+    finally:
+        for image in images:
+            image.close()
+    return written
+
+
+def _markdown_escape(text: str) -> str:
+    """Keep the writer's characters from being read as Markdown syntax."""
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("`", "\\`")
+
+
+def _markdown_inline(runs) -> str:
+    """One line of text with the emphasis its spans carry."""
+    parts = []
+    for run in runs:
+        text = _markdown_escape(run["text"])
+        stripped = text.strip()
+        if not stripped:
+            parts.append(text)
+            continue
+        lead = text[:len(text) - len(text.lstrip())]
+        trail = text[len(text.rstrip()):]
+        marker = ""
+        if run.get("bold"):
+            marker += "**"
+        if run.get("italic"):
+            marker += "*"
+        parts.append(f"{lead}{marker}{stripped}{marker[::-1]}{trail}")
+    return "".join(parts).strip()
+
+
+def _heading_level(size: float, body_size: float, bold: bool) -> int:
+    """How many ``#`` a line of this size deserves, or 0 for body text.
+
+    Size is the only honest signal a PDF gives: it carries no outline levels.
+    A line has to stand clearly above the page's body size to become a
+    heading, so ordinary text is never promoted.
+    """
+    if body_size <= 0:
+        return 0
+    ratio = size / body_size
+    if ratio >= 1.6:
+        return 1
+    if ratio >= 1.3:
+        return 2
+    if ratio >= 1.15:
+        return 3
+    if bold and ratio >= 1.05:
+        return 4
+    return 0
+
+
+def _markdown_table(rows, rtl: bool) -> list:
+    """A detected table as a pipe table; the header row is its first row."""
+    width = max(len(row) for row in rows)
+    lines = []
+    for index, row in enumerate(rows):
+        values = [_markdown_escape((value or "").replace("\n", " ").strip())
+                  for value in row]
+        values += [""] * (width - len(values))
+        if rtl:
+            values = list(reversed(values))
+        lines.append("| " + " | ".join(values) + " |")
+        if index == 0:
+            lines.append("| " + " | ".join(["---"] * width) + " |")
+    return lines
+
+
+def _export_markdown(doc, pages, target, progress, language="ara+eng"):
+    """Markdown with the structure the page actually shows.
+
+    Headings come from font size relative to the page's body size, detected
+    tables become pipe tables, and bold or italic spans keep their emphasis.
+    Nothing is invented: a page with one text size produces no headings.
+    """
+    repair = _TextRepair(doc)
+    out = []
+    recognised_pages = []
+    for index, number in enumerate(pages, 1):
+        page = doc[number - 1]
+        if index > 1:
+            out.append("---")
+            out.append("")
+        if not page.get_text().strip():
+            # A scanned page has no lines and no tables to read, so the
+            # recognised text is written as plain paragraphs and the page is
+            # marked, rather than passed off as extracted structure.
+            recognised = recognise_page(page, language)
+            if not recognised.strip():
+                raise ValueError("No text layer, and recognition could not "
+                                 "read this page")
+            recognised_pages.append(number)
+            for paragraph in recognised.split("\n"):
+                if paragraph.strip():
+                    out.append(_markdown_escape(paragraph.strip()))
+                    out.append("")
+            if progress:
+                progress(index, len(pages))
+            continue
+        try:
+            tables = [table for table in _detected_tables(page, repair)
+                      if table.bbox is not None]
+        except ValueError:
+            tables = []
+        items = [(table.bbox.y0, table.bbox.x0, 1, table) for table in tables]
+        sizes = []
+        for line in _page_lines(page, repair):
+            box = fitz.Rect(line["bbox"])
+            centre = fitz.Point((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2)
+            if any(table.bbox.contains(centre) for table in tables):
+                continue
+            runs = _line_runs(line, page, repair)
+            if not runs or not "".join(run["text"] for run in runs).strip():
+                continue
+            sizes.extend(run["size"] for run in runs)
+            items.append((box.y0, box.x0, 2, (runs, box)))
+        body_size = _median(sizes) if sizes else 0.0
+        for _top, _left, kind, payload in _reading_order(items):
+            if kind == 1:
+                rows = [list(row) for row in payload if any(
+                    (value or "").strip() for value in row)]
+                if not rows:
+                    continue
+                out.extend(_markdown_table(
+                    rows, payload.borderless and _rows_are_rtl(rows)))
+                out.append("")
+                continue
+            runs, _box = payload
+            text = _markdown_inline(runs)
+            if not text:
+                continue
+            size = max(run["size"] for run in runs)
+            bold = all(run.get("bold") for run in runs)
+            level = _heading_level(size, body_size, bold)
+            out.append("#" * level + " " + text if level else text)
+            out.append("")
+        if progress:
+            progress(index, len(pages))
+    while out and not out[-1]:
+        out.pop()
+    if recognised_pages:
+        numbers = ", ".join(str(number) for number in recognised_pages)
+        out.append("")
+        out.append(f"<!-- Text on page(s) {numbers} was read by recognition, "
+                   f"not extracted from the file. -->")
+    Path(target).write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
+def recognise_page(page, language="ara+eng"):
+    """Read a page that carries no text layer, using the bundled engine.
+
+    Returns the recognised text, or an empty string when recognition is
+    unavailable or found nothing.  The caller decides what to do with that;
+    recognised text is never silently presented as if it came from the file.
+    """
+    try:
+        from src.engine.ocr_engine import OCREngine
+
+        engine = OCREngine(language)
+        if not engine.is_available():
+            return ""
+        text, _boxes = engine.ocr_page(page)
+        return text or ""
+    except Exception:
+        logger.exception("Automatic recognition failed")
+        return ""
+
+
+def _text_of_page(page, language, scanned):
+    """The page's own text, or recognised text for a scanned page.
+
+    *scanned* is a list the caller passes in; the 1-based numbers of the
+    pages that had to be recognised are appended to it, so the export can
+    say so instead of pretending the text was extracted.
+    """
+    text = page.get_text()
+    if text.strip():
+        return text
+    recognised = recognise_page(page, language)
+    if recognised.strip():
+        scanned.append(page.number + 1)
+        return recognised
+    raise ValueError("No text layer, and recognition could not read this page")
+
+
+def export_pdf(data, target, pages, output_format, progress=None, dpi=150,
+               language="ara+eng"):
     if output_format not in SUPPORTED or not 72 <= dpi <= 600:
+        raise ValueError("Unsupported conversion options")
+    if language not in {"ara", "eng", "ara+eng"}:
         raise ValueError("Unsupported conversion options")
     with fitz.open(stream=data, filetype="pdf") as doc:
         if not pages or len(set(pages)) != len(pages) or any(
             type(n) is not int or not 1 <= n <= doc.page_count for n in pages
         ):
             raise ValueError("Invalid page selection")
-        if output_format in {"png", "jpg", "webp", "svg"} and len(pages) != 1:
+        if output_format == "svg" and len(pages) != 1:
             raise ValueError("This output format requires one selected page")
         if output_format in {"xlsx", "csv"}:
             _export_tables(doc, pages, target, output_format, progress)
@@ -1254,20 +1486,10 @@ def export_pdf(data, target, pages, output_format, progress=None, dpi=150):
             _export_editable_pptx(doc, pages, target, progress)
             return
         if output_format in {"png", "jpg", "tiff", "webp"}:
-            images = []
-            for index, number in enumerate(pages, 1):
-                pix = doc[number - 1].get_pixmap(dpi=dpi, alpha=False)
-                images.append(Image.frombytes("RGB", (pix.width, pix.height), pix.samples))
-                if progress:
-                    progress(index, len(pages))
-            try:
-                options = {"quality": 90} if output_format in {"jpg", "webp"} else {}
-                if output_format == "tiff":
-                    options.update(save_all=True, append_images=images[1:], compression="tiff_deflate")
-                images[0].save(target, format={"jpg": "JPEG", "tiff": "TIFF"}.get(output_format, output_format.upper()), **options)
-            finally:
-                for image in images:
-                    image.close()
+            _export_images(doc, pages, target, output_format, dpi, progress)
+            return
+        if output_format == "md":
+            _export_markdown(doc, pages, target, progress, language)
             return
         if output_format == "svg":
             Path(target).write_text(doc[pages[0] - 1].get_svg_image(), encoding="utf-8")
@@ -1275,24 +1497,27 @@ def export_pdf(data, target, pages, output_format, progress=None, dpi=150):
                 progress(1, 1)
             return
         entries = []
+        scanned = []
         for index, number in enumerate(pages, 1):
             page = doc[number - 1]
-            text = page.get_text()
+            text = _text_of_page(page, language, scanned)
             if any("\ufb50" <= ch <= "\ufdff" or "\ufe70" <= ch <= "\ufeff" for ch in text):
                 raise ValueError("Arabic text requires logical OCR before text conversion")
-            if not text.strip():
-                raise ValueError("No text layer; run OCR before text conversion")
             entries.append({"page": number, "width": page.rect.width,
-                            "height": page.rect.height, "text": text})
+                            "height": page.rect.height, "text": text,
+                            "source": "recognised" if number in scanned else "text layer"})
             if progress:
                 progress(index, len(pages))
         if output_format == "json":
-            result = json.dumps({"mode": "logical-text", "pages": entries}, ensure_ascii=False, indent=2)
+            result = json.dumps({"mode": "logical-text", "pages": entries},
+                                ensure_ascii=False, indent=2)
         elif output_format == "html":
             chunks = []
             for entry in entries:
                 direction = "rtl" if any("\u0600" <= c <= "\u06ff" for c in entry["text"]) else "ltr"
-                chunks.append(f'<section dir="{direction}"><pre>{html.escape(entry["text"])}</pre></section>')
+                chunks.append(
+                    f'<section dir="{direction}" data-source="{entry["source"]}">'
+                    f'<pre>{html.escape(entry["text"])}</pre></section>')
             result = '<!doctype html><html><head><meta charset="utf-8"><title>PDF text export</title></head><body>' + "\n".join(chunks) + "</body></html>"
         else:
             result = "\n\n".join(entry["text"] for entry in entries)

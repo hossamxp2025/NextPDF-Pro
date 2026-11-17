@@ -23,7 +23,7 @@ def guarded_run(request_path, action):
         logger.exception("Child job failed")
         detail = traceback.format_exc()
         try:
-            for output in directory.glob("output.*"):
+            for output in directory.glob("output*.*"):
                 output.unlink()
             (directory / "traceback.txt").write_text(detail, encoding="utf-8")
             code = "no_tables" if str(exc) == "No supported tables were found" else "job_failed"

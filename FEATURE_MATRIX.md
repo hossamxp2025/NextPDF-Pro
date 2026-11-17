@@ -54,7 +54,13 @@
 | PDF/A | Not Implemented | |
 | مقارنة ملفين | Not Implemented | |
 | معالجة دُفعية | Not Implemented | |
-| تحسين ضغط PDF | Not Implemented | |
+| تحسين ضغط PDF | Implemented & Tested | إزالة ما لا يحتاجه الملف + إعادة ترميز الصور؛ يبلّغ الحجم قبل وبعد، وإذا لم ينقص الحجم يقول ذلك ولا يكتب ملفًا أكبر. يحافظ على التشفير. `tests/test_compression.py` |
+| تحكم في دقة التصدير (DPI) | Implemented & Tested | 72–600 في حوار التحويل، ويظهر فقط مع الصيغ التي تُرسَم صورًا |
+| تصدير عدة صفحات صورًا | Implemented & Tested | PNG/JPEG/WEBP تُكتب ملفات مرقَّمة، وTIFF يضمّها في ملف واحد |
+| Markdown حقيقي | Implemented & Tested | عناوين من أحجام النص، جداول بصيغة pipe، تأكيد عريض/مائل. `tests/test_markdown_export.py` |
+| قراءة آلية للملف الممسوح عند التحويل | Implemented & Tested | الصفحة بلا طبقة نص تُقرأ آليًا ويُعلَّم ناتجها أنه مقروء آليًا |
+| طباعة | Implemented & Tested | حوار الطباعة النظامي مع نطاق الصفحات |
+| خصائص المستند | Implemented & Tested | ملف، صفحات، مقاس، بيانات المستند، حالة الحماية والصلاحيات (للعرض فقط) |
 | EXE مستقل | Built | تم بناؤه باستخدام PyInstaller |
 | Setup Installer | Built | تم بناؤه باستخدام Inno Setup |
 | التراجع والإعادة | Implemented & Tested | Command Pattern |

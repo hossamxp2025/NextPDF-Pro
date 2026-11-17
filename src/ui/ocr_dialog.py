@@ -4,9 +4,20 @@ import re
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QComboBox,
-                              QLineEdit, QPushButton, QProgressBar, QLabel, QFileDialog)
+                              QLineEdit, QPushButton, QProgressBar, QLabel,
+                              QFileDialog, QSpinBox)
 from src.i18n import get_translator
 from src.workers.ocr_process import OCRProcess, ConversionProcess
+
+
+#: Conversion formats whose output is a rendered image, so the resolution
+#: matters.  OCR recognition runs at its own fixed resolution, so the control
+#: is not shown there rather than pretending to change it.
+RASTER_FORMATS = {"png", "jpg", "tiff", "webp", "docx", "pptx"}
+
+#: Conversion formats that read the text, so a scanned page is recognised
+#: automatically and the recognition language matters.
+TEXT_FORMATS = {"txt", "html", "md", "json"}
 
 
 class OCRDialog(QDialog):
@@ -18,7 +29,7 @@ class OCRDialog(QDialog):
             "Save OCR output": "Save conversion output", "OCR failed": "Conversion failed",
             "Processing OCR": "Converting PDF", "OCR output saved": "Conversion output saved",
             "OCR cancelled": "Conversion cancelled", "Cancelling OCR": "Cancelling conversion",
-            "OCR preserves the page image; it does not restore editable layout.": "Text formats export logical text, not original layout. PNG/JPEG/WEBP/SVG require one selected page. TIFF supports multiple pages.",
+            "OCR preserves the page image; it does not restore editable layout.": "Text formats export logical text, not original layout. SVG requires one selected page. Several pages of PNG, JPEG or WEBP are written as numbered files beside the one you name; TIFF holds them all in one file.",
         } if conversion_format else {}
         translator = get_translator()
         self.tr_text = lambda key: translator.tr(mapping.get(key, key))
@@ -42,13 +53,24 @@ class OCRDialog(QDialog):
         if conversion_format:
             self.output_format.clear()
             self.output_format.addItem(conversion_format.upper(), conversion_format)
+        # Resolution only changes a rendered image; it means nothing for the
+        # text formats, so it is only shown where it has an effect.
+        self.dpi = QSpinBox()
+        self.dpi.setRange(72, 600)
+        self.dpi.setSingleStep(25)
+        self.dpi.setValue(150)
+        self.dpi.setSuffix(" DPI")
         form.addRow(tr("Pages"), self.scope)
         form.addRow(tr("Page range"), self.pages)
         form.addRow(tr("Recognition language"), self.language)
         form.addRow(tr("Output format"), self.output_format)
-        if conversion_format:
+        form.addRow(tr("Resolution"), self.dpi)
+        if conversion_format and conversion_format not in TEXT_FORMATS:
             self.language.hide()
             form.labelForField(self.language).hide()
+        if conversion_format is None or conversion_format not in RASTER_FORMATS:
+            self.dpi.hide()
+            form.labelForField(self.dpi).hide()
         layout.addLayout(form)
         self.note = QLabel(tr("OCR preserves the page image; it does not restore editable layout."))
         self.note.setWordWrap(True)
@@ -58,6 +80,10 @@ class OCRDialog(QDialog):
             self.note.setText(tr("Editable Word: tables, shading, fonts and reading order are rebuilt; absolute positions are not. Legacy visual Arabic is refused."))
         elif conversion_format == "pptx_editable":
             self.note.setText(tr("Editable slides: real positioned text boxes and images, approximate layout. Legacy visual Arabic is refused."))
+        elif conversion_format == "md":
+            self.note.setText(tr("Markdown: headings come from the text sizes on the page and detected tables become real tables. A scanned page is recognised automatically and marked as recognised."))
+        elif conversion_format in TEXT_FORMATS:
+            self.note.setText(tr("Logical text, not the original layout. A scanned page is recognised automatically with the chosen language."))
         elif conversion_format in {"xlsx", "csv"}:
             self.note.setText(tr("Extracts rectangular tables and some aligned borderless tables. Review the output. CSV requires one table. Merged cells and scanned tables are not reliably supported."))
         layout.addWidget(self.note)
@@ -136,7 +162,7 @@ class OCRDialog(QDialog):
             self._output = None
             self.open_button.setEnabled(False)
             self.worker.start(data, target, self.language.currentData(), pages,
-                              self.output_format.currentData())
+                              self.output_format.currentData(), self.dpi.value())
             self._set_busy(True)
             self.status.setText(self.tr_text("Processing OCR"))
         except (ValueError, OSError, RuntimeError) as exc:
@@ -144,7 +170,8 @@ class OCRDialog(QDialog):
             self.status.setText(self.tr_text(key))
 
     def _set_busy(self, busy):
-        for widget in (self.start_button, self.scope, self.pages, self.language, self.output_format):
+        for widget in (self.start_button, self.scope, self.pages, self.language,
+                       self.output_format, self.dpi):
             widget.setEnabled(not busy)
 
     def _progress(self, current, total):
@@ -155,7 +182,12 @@ class OCRDialog(QDialog):
         self._set_busy(False)
         self._output = path
         self.open_button.setEnabled(True)
-        self.status.setText(self.tr_text("OCR output saved"))
+        written = len(getattr(self.worker, "published_files", ()) or ())
+        if written > 1:
+            self.status.setText(
+                f"{self.tr_text('OCR output saved')} ({written})")
+        else:
+            self.status.setText(self.tr_text("OCR output saved"))
 
     def _failed(self, message):
         self._set_busy(False)

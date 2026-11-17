@@ -179,8 +179,8 @@ class MainWindow(QMainWindow):
                 ("Save", self._save_file, "file_save", True),
                 ("Save As", self._save_as_file, "file_save_as", True)]),
             ("Document", [
-                ("Print", None, "file_print", True),
-                ("Properties", None, "properties", True)])])
+                ("Print", self._print_document, "file_print", True),
+                ("Properties", self._show_properties, "properties", True)])])
         ribbon.add_page("edit", "Edit PDF", groups=[
             ("History", [
                 ("Undo", self._undo, "edit_undo", True),
@@ -210,7 +210,9 @@ class MainWindow(QMainWindow):
             ("CSV grid tables", lambda: self._run_conversion("csv"), "convert_csv", True)]
         ribbon.add_page("convert", "Convert PDF", groups=[
             ("Images and text", convert_tools),
-            ("Office", office_tools)])
+            ("Office", office_tools),
+            ("Size", [("Reduce the file size", self._compress_document,
+                       "compress", True)])])
         ribbon.add_page("create", "Create PDF", groups=[
             ("From files", [("Create from files", lambda: self._create_pdf("all"), "create_pdf", False)]),
             ("Images and text", [
@@ -717,6 +719,109 @@ class MainWindow(QMainWindow):
         viewer.set_redact_mode(False)
         self._refresh_current_view()
         self.status_label.setText(f"{tr('Removed areas')}: {removed}")
+
+    # ------------------------------------------------------- document tools
+    def _show_properties(self):
+        """Show what the open file says about itself."""
+        from src.ui.properties_dialog import PropertiesDialog
+
+        if self.current_document is None:
+            return
+        dialog = PropertiesDialog(self.current_document, self)
+        dialog.exec()
+
+    def _print_document(self):
+        """Print the open document through the system print dialog."""
+        from PySide6.QtPrintSupport import QPrinter, QPrintDialog
+        from PySide6.QtGui import QPainter, QImage
+
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None or document.doc is None:
+            return
+        printer = QPrinter(QPrinter.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        dialog.setWindowTitle(tr("Print"))
+        if dialog.exec() != QPrintDialog.Accepted:
+            return
+        first = max(1, printer.fromPage() or 1)
+        last = printer.toPage() or document.page_count
+        last = min(last, document.page_count)
+        painter = QPainter()
+        if not painter.begin(printer):
+            QMessageBox.critical(self, tr("Error"), tr("Printing failed"))
+            return
+        try:
+            dpi = printer.resolution() or 300
+            for number in range(first, last + 1):
+                if number > first:
+                    printer.newPage()
+                page = document.get_page(number)
+                if page is None:
+                    continue
+                pixmap = page.get_pixmap(dpi=dpi, alpha=False)
+                image = QImage(pixmap.samples, pixmap.width, pixmap.height,
+                               pixmap.stride, QImage.Format_RGB888)
+                area = painter.viewport()
+                scaled = image.size().scaled(area.size(), Qt.KeepAspectRatio)
+                painter.setViewport(area.x(), area.y(), scaled.width(),
+                                    scaled.height())
+                painter.setWindow(image.rect())
+                painter.drawImage(0, 0, image)
+        except Exception:
+            logger.exception("Printing failed")
+            QMessageBox.critical(self, tr("Error"), tr("Printing failed"))
+        finally:
+            painter.end()
+        self.status_label.setText(f"{tr('Sent to the printer')}: "
+                                  f"{last - first + 1}")
+
+    def _compress_document(self):
+        """Write a smaller copy of the open file and report what it saved."""
+        from src.engine.optimizer import compress_pdf
+        from src.ui.properties_dialog import human_size
+
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return
+        if not document.file_path or not os.path.isfile(document.file_path):
+            QMessageBox.information(self, tr("Reduce the file size"),
+                                    tr("Save the document first."))
+            return
+        if document.is_modified:
+            QMessageBox.information(
+                self, tr("Reduce the file size"),
+                tr("There are unsaved changes. Save them first, so the smaller "
+                   "copy holds them too."))
+            return
+        base, ext = os.path.splitext(document.file_path)
+        target, _ = QFileDialog.getSaveFileName(
+            self, tr("Save the smaller file as"), f"{base}-small{ext or '.pdf'}",
+            f"{tr('PDF files')} (*.pdf)")
+        if not target:
+            return
+        try:
+            result = compress_pdf(document.file_path, target,
+                                  password=getattr(document, "_open_password", None))
+        except Exception as exc:
+            logger.exception("Compression failed")
+            QMessageBox.critical(self, tr("Error"),
+                                 f"{tr('Could not reduce the file size')}: {exc}")
+            return
+        if not result["changed"]:
+            QMessageBox.information(
+                self, tr("Reduce the file size"),
+                tr("This file is already as small as this tool can make it; "
+                   "the copy is identical."))
+            return
+        percent = round(result["ratio"] * 100)
+        QMessageBox.information(
+            self, tr("Reduce the file size"),
+            f"{human_size(result['before'])} ← → {human_size(result['after'])}"
+            f"  ({tr('Saved')} {percent}%)")
+        self.status_label.setText(
+            f"{tr('Saved')} {percent}% — {human_size(result['after'])}")
 
     def _refresh_current_view(self):
         """Redraw the viewer after the page content changed underneath it."""

@@ -13,9 +13,12 @@ def _convert(request_path):
     options = json.loads(request.read_text(encoding="utf-8"))
     if options["format"] not in SUPPORTED:
         raise ValueError("Unsupported conversion")
+    dpi = int(options.get("dpi", 150))
+    language = options.get("language", "ara+eng")
     export_pdf((request.parent / "input.pdf").read_bytes(),
                str(request.parent / ("output." + options["format"])),
-               options["pages"], options["format"], progress=progress)
+               options["pages"], options["format"], progress=progress, dpi=dpi,
+               language=language)
     return 0
 
 
