@@ -26,6 +26,49 @@ except ImportError:  # pragma: no cover - older environments
 
 logger = logging.getLogger("NextPDF")
 
+# The permission bits a reader checks.  PyMuPDF's own default for
+# ``Document.save(permissions=...)`` is 4095, i.e. everything allowed.
+FULL_PERMISSIONS = 4095
+
+#: ``Document.permissions`` returns a signed integer with the unused high bits
+#: set (-4 for an unrestricted file), so it is masked before being compared.
+PERMISSION_MASK = 4095
+
+# PyMuPDF quirk this module works around: reading ``Document.needs_pass`` on a
+# document that has already been authenticated drops its decryption state, and
+# every stream read afterwards returns empty bytes until ``authenticate`` is
+# called again.  ``needs_pass`` is therefore only read before authenticating.
+
+#: The permissions a user can switch off in the protection dialog, in the
+#: order they are shown.  The value is the PDF permission bit.
+PERMISSION_BITS = {
+    "print": fitz.PDF_PERM_PRINT,
+    "modify": fitz.PDF_PERM_MODIFY,
+    "copy": fitz.PDF_PERM_COPY,
+    "annotate": fitz.PDF_PERM_ANNOTATE,
+    "form": fitz.PDF_PERM_FORM,
+    "assemble": fitz.PDF_PERM_ASSEMBLE,
+}
+
+
+def permissions_are_restricted(permissions: int) -> bool:
+    """True when any of the permissions the dialog offers is switched off."""
+    return any(not (permissions & bit) for bit in PERMISSION_BITS.values())
+
+
+def permissions_from_flags(allowed: Dict[str, bool]) -> int:
+    """Build a PDF permission integer from ``{"print": True, ...}``.
+
+    Bits that are not named in *allowed* are left on, so a caller only has to
+    list what it wants to forbid.  Accessibility extraction is always allowed.
+    """
+    value = FULL_PERMISSIONS
+    for name, bit in PERMISSION_BITS.items():
+        if allowed.get(name, True) is False:
+            value &= ~bit
+    return value | fitz.PDF_PERM_ACCESSIBILITY
+
+
 # Arabic block, supplement, and the presentation forms MuPDF returns when it
 # extracts shaped glyphs (the app's own inserted text is stored shaped).
 _RTL_RANGES = (
@@ -255,12 +298,25 @@ class PDFDocument:
         self._backup_path: Optional[str] = None
         self.last_error: Optional[str] = None
         self.needs_password: bool = False
+        self.wrong_password: bool = False
+        self.is_encrypted: bool = False
+        self.permissions: int = FULL_PERMISSIONS
+        self._open_password: Optional[str] = None
 
     # ------------------------------------------------------------------ load
-    def load(self, file_path: str) -> bool:
-        """Open *file_path*.  Never raises for user input errors."""
+    def load(self, file_path: str, password: Optional[str] = None) -> bool:
+        """Open *file_path*.  Never raises for user input errors.
+
+        *password* is tried when the file is encrypted.  It may be the user
+        password or the owner password; the owner password additionally lifts
+        the permission restrictions recorded in the file.
+        """
         self.last_error = None
         self.needs_password = False
+        self.wrong_password = False
+        self.is_encrypted = False
+        self.permissions = FULL_PERMISSIONS
+        self._open_password = None
         try:
             if self.doc is not None:
                 self.close()
@@ -276,12 +332,20 @@ class PDFDocument:
 
             self.doc = fitz.open(file_path)
             if getattr(self.doc, "needs_pass", False):
-                self.needs_password = True
-                self.last_error = "Document is encrypted"
-                logger.warning("Encrypted PDF requires a password: %s", file_path)
-                self.doc.close()
-                self.doc = None
-                return False
+                self.is_encrypted = True
+                if not password or not self.doc.authenticate(password):
+                    self.needs_password = True
+                    self.wrong_password = bool(password)
+                    self.last_error = (
+                        "Password is incorrect" if password else "Document is encrypted"
+                    )
+                    logger.warning(
+                        "Encrypted PDF not opened (%s): %s", self.last_error, file_path
+                    )
+                    self.doc.close()
+                    self.doc = None
+                    return False
+                self._open_password = password
             if not self.doc.is_pdf:
                 self.last_error = "Unsupported file"
                 self.doc.close()
@@ -290,6 +354,12 @@ class PDFDocument:
 
             self.file_path = file_path
             self.original_path = file_path
+            try:
+                self.permissions = int(self.doc.permissions) & PERMISSION_MASK
+            except Exception:
+                self.permissions = FULL_PERMISSIONS
+            if permissions_are_restricted(self.permissions):
+                self.is_encrypted = True
             self._refresh_models()
             self.is_modified = False
             logger.info("Loaded PDF: %s (%d pages)", file_path, self.page_count)
@@ -476,6 +546,51 @@ class PDFDocument:
         self.annotations.setdefault(page_number, []).append(annotation)
         self.is_modified = True
 
+    # ------------------------------------------------------------- redaction
+    def redact_areas(self, areas: Dict[int, List[Tuple[float, float, float, float]]],
+                     remove_images: bool = True) -> int:
+        """Remove everything under the given 1-based page rectangles.
+
+        The content is taken out of the page, not covered, so it cannot be
+        recovered by selecting or extracting.  Returns how many areas were
+        applied; the caller still has to save the document.
+        """
+        from src.engine.redaction import redact_areas as _redact_areas
+
+        if self.doc is None:
+            self.last_error = "No document open"
+            return 0
+        try:
+            applied = _redact_areas(self.doc, areas, remove_images=remove_images)
+        except Exception as exc:
+            self.last_error = f"Redaction failed: {exc}"
+            logger.exception("Redaction failed")
+            return 0
+        if applied:
+            self.is_modified = True
+            self._refresh_models()
+        return applied
+
+    def redact_text(self, needle: str, pages: Optional[List[int]] = None,
+                    remove_images: bool = True) -> int:
+        """Remove every occurrence of *needle* from the document."""
+        from src.engine.redaction import redact_matches
+
+        if self.doc is None:
+            self.last_error = "No document open"
+            return 0
+        try:
+            applied = redact_matches(self.doc, needle, pages=pages,
+                                     remove_images=remove_images)
+        except Exception as exc:
+            self.last_error = f"Redaction failed: {exc}"
+            logger.exception("Redaction failed")
+            return 0
+        if applied:
+            self.is_modified = True
+            self._refresh_models()
+        return applied
+
     # ------------------------------------------------------------------ save
     def _metadata_for_save(self) -> Dict[str, str]:
         meta = {k: v for k, v in (self.metadata or {}).items() if isinstance(v, str)}
@@ -483,13 +598,95 @@ class PDFDocument:
         meta.setdefault("producer", "NextPDF Pro (PyMuPDF)")
         return meta
 
-    def save(self, output_path: Optional[str] = None, incremental: bool = False) -> bool:
+    def _apply_metadata(self, strip: bool) -> None:
+        """Write the document information before a save.
+
+        With *strip* the /Info dictionary and the XMP packet are both removed,
+        so no author, title, producer or timestamp survives in the file.  The
+        identifying pair NextPDF normally writes is not put back.
+        """
+        if strip:
+            try:
+                self.doc.set_metadata({})
+            except Exception:
+                logger.debug("Could not clear metadata", exc_info=True)
+            try:
+                self.doc.del_xml_metadata()
+            except Exception:
+                logger.debug("Could not clear XMP metadata", exc_info=True)
+            self.metadata = {}
+            return
+        try:
+            self.doc.set_metadata(self._metadata_for_save())
+        except Exception:
+            logger.debug("Could not update metadata", exc_info=True)
+
+    def _encryption_kwargs(
+        self,
+        user_password: Optional[str],
+        owner_password: Optional[str],
+        permissions: Optional[int],
+        remove_encryption: bool,
+    ) -> Dict[str, Any]:
+        """Decide how the saved file is encrypted.
+
+        Without any protection argument an encrypted document keeps its own
+        encryption, so an ordinary save of a protected file never quietly
+        strips the protection.  ``remove_encryption`` is the only way to drop
+        it, and it needs the file to have been opened successfully, which for
+        a user-password file means the password was supplied.
+        """
+        if remove_encryption:
+            return {"encryption": fitz.PDF_ENCRYPT_NONE}
+        if user_password or owner_password:
+            return {
+                "encryption": fitz.PDF_ENCRYPT_AES_256,
+                "owner_pw": owner_password or user_password,
+                "user_pw": user_password or "",
+                "permissions": (
+                    FULL_PERMISSIONS if permissions is None else int(permissions)
+                ),
+            }
+        if self.is_encrypted:
+            return {"encryption": fitz.PDF_ENCRYPT_KEEP}
+        return {"encryption": fitz.PDF_ENCRYPT_NONE}
+
+    @staticmethod
+    def _reopen_saved(path: str, password: Optional[str]):
+        """Open *path* after a save, authenticating it when it is protected.
+
+        ``needs_pass`` is read once, before authenticating, and never again on
+        this document: reading it afterwards drops the decryption state (see
+        the note at the top of this module).
+        """
+        doc = fitz.open(path)
+        if getattr(doc, "needs_pass", False):
+            if not password or not doc.authenticate(password):
+                doc.close()
+                return None
+        return doc
+
+    def save(
+        self,
+        output_path: Optional[str] = None,
+        incremental: bool = False,
+        user_password: Optional[str] = None,
+        owner_password: Optional[str] = None,
+        permissions: Optional[int] = None,
+        remove_encryption: bool = False,
+        strip_metadata: bool = False,
+    ) -> bool:
         """
         Save the document.
 
         A full save is always used.  It is written to a temporary file in the
         destination directory and atomically moved into place, which avoids
         PyMuPDF's restriction that incremental saves cannot garbage-collect.
+
+        Passing *user_password* and/or *owner_password* encrypts the result
+        with AES-256; *permissions* then restricts what a reader may do.  The
+        saved file is reopened afterwards, so the password that was just set
+        is used to reauthenticate and the open document stays usable.
         """
         self.last_error = None
         if self.doc is None:
@@ -512,12 +709,12 @@ class PDFDocument:
         tmp_fd, tmp_path = tempfile.mkstemp(prefix=".nextpdf_", suffix=".pdf", dir=out_dir)
         os.close(tmp_fd)
         try:
-            try:
-                self.doc.set_metadata(self._metadata_for_save())
-            except Exception:
-                logger.debug("Could not update metadata", exc_info=True)
+            self._apply_metadata(strip_metadata)
+            enc_kwargs = self._encryption_kwargs(
+                user_password, owner_password, permissions, remove_encryption
+            )
             self._subset_fonts()
-            self.doc.save(tmp_path, garbage=4, deflate=True, clean=True)
+            self.doc.save(tmp_path, garbage=4, deflate=True, clean=True, **enc_kwargs)
             if self.doc is not None:
                 self.doc.close()
                 self.doc = None
@@ -528,7 +725,39 @@ class PDFDocument:
                 except Exception:
                     logger.warning("Could not create backup %s", self._backup_path, exc_info=True)
             os.replace(tmp_path, output_path)
-            self.doc = fitz.open(output_path)
+
+            if remove_encryption:
+                reopen_password: Optional[str] = None
+            elif user_password or owner_password:
+                reopen_password = user_password or owner_password
+            else:
+                reopen_password = self._open_password
+
+            self.doc = self._reopen_saved(output_path, reopen_password)
+            if self.doc is None:
+                # The file on disk is complete; only this session's open copy
+                # is lost.  Say so instead of reporting a clean save.
+                self.last_error = (
+                    "The file was written, but the open copy could not be "
+                    "reopened with the password that was just set"
+                )
+                logger.error("%s: %s", self.last_error, output_path)
+                return False
+            self._open_password = reopen_password
+            # The protection state is taken from what was just written, not
+            # read back from the reopened document: reading ``needs_pass`` or
+            # ``permissions`` on a freshly authenticated document drops its
+            # decryption state and every later read returns empty content.
+            if remove_encryption:
+                self.is_encrypted = False
+                self.permissions = FULL_PERMISSIONS
+            elif user_password or owner_password:
+                self.is_encrypted = True
+                self.permissions = (
+                    FULL_PERMISSIONS if permissions is None else int(permissions)
+                )
+            self.needs_password = False
+            self.wrong_password = False
             self.file_path = output_path
             self.original_path = output_path
             self.is_modified = False
