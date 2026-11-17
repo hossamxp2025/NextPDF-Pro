@@ -35,7 +35,7 @@ from src.ui.components import (
     ModernButton, ModernIconButton, Card, RibbonGroup,
     EmptyState, PropertiesPanel, ThumbnailPanel, ThumbnailItem
 )
-from src.ui.pdf_viewer import PDFViewer, MODE_REDACT, MODE_COMMENT
+from src.ui.pdf_viewer import PDFViewer, MODE_REDACT, MODE_COMMENT, MODE_FIELD
 from src.ui.ribbon import Ribbon
 
 logger = logging.getLogger("NextPDF")
@@ -220,6 +220,19 @@ class MainWindow(QMainWindow):
                 ("Text to PDF", lambda: self._create_pdf("text"), "create_text", False)])])
         ribbon.add_page("ocr", "OCR", groups=[
             ("Recognition", [("OCR", self._run_ocr, "ocr_scan", True)])])
+        ribbon.add_page("forms", "Forms", groups=[
+            ("Fill", [
+                ("Fill the form", self._fill_form, "form_fill", True),
+                ("Flatten the form", self._flatten_form, "form_flatten", True)]),
+            ("Build", [
+                ("Add a text field", lambda: self._field_mode("text"),
+                 "field_text", True),
+                ("Add a tick box", lambda: self._field_mode("checkbox"),
+                 "field_checkbox", True),
+                ("Add a list of choices", lambda: self._field_mode("dropdown"),
+                 "field_dropdown", True),
+                ("Remove a field", self._remove_form_field, "field_delete",
+                 True)])])
         ribbon.add_page("review", "Review", groups=[
             ("Comments", [
                 ("Highlight", lambda: self._comment_mode("highlight"),
@@ -456,6 +469,9 @@ class MainWindow(QMainWindow):
         viewer.comment_drawn.connect(
             lambda kind, page, payload, c=context:
             self._commit_comment(c, kind, page, payload))
+        viewer.field_drawn.connect(
+            lambda kind, page, rect, c=context:
+            self._commit_field(c, kind, page, rect))
 
         tab_index = self.tab_widget.addTab(viewer, os.path.basename(file_path))
         self.tab_widget.setCurrentIndex(tab_index)
@@ -742,6 +758,170 @@ class MainWindow(QMainWindow):
         viewer.set_redact_mode(False)
         self._refresh_current_view()
         self.status_label.setText(f"{tr('Removed areas')}: {removed}")
+
+    # ---------------------------------------------------------------- forms
+    def _fill_form(self):
+        """Fill the interactive fields of the open document."""
+        from PySide6.QtWidgets import QDialog
+        from src.ui.form_dialog import FormDialog
+
+        tr = get_translator().tr
+        context = self.current_context
+        if context is None:
+            return
+        document = context.document
+        fields = document.form_fields()
+        if not fields:
+            QMessageBox.information(
+                self, tr("Fill the form"),
+                tr("This document has no interactive fields."))
+            return
+        dialog = FormDialog(fields, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        values = dialog.changed_values()
+        if not values:
+            return
+        appearance_warning = []
+
+        def fill():
+            filled = 0
+            for name, value in values.items():
+                result = document.set_field_value(name, value)
+                if result["stored"]:
+                    filled += 1
+                    if not result["appearance_ok"]:
+                        appearance_warning.append(name)
+            return filled or False
+
+        command = PDFSnapshotCommand(document, "Fill the form", fill)
+        context.command_stack.push(command)
+        if not command.result:
+            QMessageBox.warning(self, tr("Fill the form"),
+                                document.last_error or tr("Nothing was filled"))
+            return
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
+        self.status_label.setText(f"{tr('Filled fields')}: {command.result}")
+        if appearance_warning:
+            QMessageBox.information(self, tr("Fill the form"),
+                                    FormDialog.arabic_warning())
+
+    def _flatten_form(self):
+        """Make the filled values part of the page content."""
+        tr = get_translator().tr
+        context = self.current_context
+        if context is None:
+            return
+        document = context.document
+        if not document.form_fields():
+            QMessageBox.information(
+                self, tr("Flatten the form"),
+                tr("This document has no interactive fields."))
+            return
+        answer = QMessageBox.question(
+            self, tr("Flatten the form"),
+            tr("The values become part of the page and the form stops being "
+               "fillable. Continue?"))
+        if answer != QMessageBox.Yes:
+            return
+        command = PDFSnapshotCommand(document, "Flatten the form",
+                                     document.flatten_form)
+        context.command_stack.push(command)
+        result = command.result
+        if not result:
+            QMessageBox.warning(self, tr("Flatten the form"),
+                                document.last_error or tr("Nothing was flattened"))
+            return
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
+        self.status_label.setText(
+            f"{tr('Flattened fields')}: {result['flattened']}")
+
+    def _field_mode(self, kind):
+        """Arm the viewer to draw the next field of *kind*."""
+        tr = get_translator().tr
+        viewer = getattr(self.current_context, "viewer", None)
+        if viewer is None:
+            return
+        already = (viewer.current_mode() == MODE_FIELD
+                   and viewer.field_kind == kind)
+        viewer.set_field_mode(None if already else kind)
+        self.status_label.setText(
+            "" if already else tr("Drag where the field belongs"))
+
+    def _commit_field(self, context, kind, page, rect):
+        """Name and write a field the user drew."""
+        from PySide6.QtWidgets import QInputDialog
+
+        tr = get_translator().tr
+        document = context.document
+        name, accepted = QInputDialog.getText(self, tr("Field name"),
+                                              tr("Field name"))
+        if not accepted or not name.strip():
+            return
+        options = {}
+        if kind == "dropdown":
+            text, accepted = QInputDialog.getText(
+                self, tr("Choices"), tr("The choices, separated by commas"))
+            if not accepted:
+                return
+            choices = [part.strip() for part in text.split(",") if part.strip()]
+            if not choices:
+                QMessageBox.warning(self, tr("Forms"),
+                                    tr("A list of choices needs its choices."))
+                return
+            options["choices"] = choices
+        command = PDFSnapshotCommand(
+            document, f"Add field: {kind}",
+            lambda: document.add_form_field(page, rect, name.strip(),
+                                            kind=kind, **options))
+        context.command_stack.push(command)
+        if command.result is None:
+            QMessageBox.warning(self, tr("Forms"),
+                                document.last_error or tr("The field could not "
+                                                          "be added"))
+            return
+        context.viewer.set_field_mode(None)
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
+        self.status_label.setText(
+            f"{tr('Fields')}: {len(document.form_fields())}")
+
+    def _remove_form_field(self):
+        """Remove one field, chosen by name."""
+        from PySide6.QtWidgets import QInputDialog
+
+        tr = get_translator().tr
+        context = self.current_context
+        if context is None:
+            return
+        document = context.document
+        names = [field["name"] for field in document.form_fields()
+                 if field["name"]]
+        if not names:
+            QMessageBox.information(
+                self, tr("Remove a field"),
+                tr("This document has no interactive fields."))
+            return
+        name, accepted = QInputDialog.getItem(self, tr("Remove a field"),
+                                              tr("Field name"), names, 0, False)
+        if not accepted or not name:
+            return
+        command = PDFSnapshotCommand(document, "Remove field",
+                                     lambda: document.delete_form_field(name))
+        context.command_stack.push(command)
+        if command.result is not True:
+            QMessageBox.warning(self, tr("Forms"),
+                                document.last_error or tr("The field could not "
+                                                          "be removed"))
+            return
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
 
     # ------------------------------------------------------------- comments
     COMMENT_TITLES = {

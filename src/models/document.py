@@ -635,6 +635,94 @@ class PDFDocument:
             self.is_modified = True
         return changed
 
+    # ----------------------------------------------------------------- forms
+    def has_form(self) -> bool:
+        from src.engine.forms import is_form
+
+        return is_form(self.doc) if self.doc is not None else False
+
+    def form_fields(self) -> List[dict]:
+        from src.engine.forms import list_fields
+
+        return list_fields(self.doc) if self.doc is not None else []
+
+    def set_field_value(self, name: str, value, page_number=None) -> dict:
+        """Fill one field.  Returns the engine's result, reason included."""
+        from src.engine.forms import set_value
+
+        if self.doc is None:
+            self.last_error = "No document open"
+            return {"stored": False, "appearance_ok": True, "field": None,
+                    "reason": "No document open"}
+        try:
+            result = set_value(self.doc, name, value, page_number=page_number)
+        except Exception as exc:
+            self.last_error = f"The field could not be filled: {exc}"
+            logger.exception("Filling a field failed")
+            return {"stored": False, "appearance_ok": True, "field": None,
+                    "reason": str(exc)}
+        if result["stored"]:
+            self.is_modified = True
+        else:
+            self.last_error = result.get("reason", "The field could not be filled")
+        return result
+
+    def add_form_field(self, page_number: int, rect, name: str,
+                       kind: str = "text", **options):
+        from src.engine.forms import add_field
+
+        page = self.get_page(page_number)
+        if page is None:
+            self.last_error = "No such page"
+            return None
+        try:
+            field = add_field(page, rect, name, kind=kind, **options)
+        except ValueError as exc:
+            self.last_error = str(exc)
+            return None
+        except Exception as exc:
+            self.last_error = f"The field could not be added: {exc}"
+            logger.exception("Adding a field failed")
+            return None
+        self.is_modified = True
+        return field
+
+    def delete_form_field(self, name: str, page_number=None) -> bool:
+        from src.engine.forms import delete_field
+
+        if self.doc is None:
+            self.last_error = "No document open"
+            return False
+        try:
+            removed = delete_field(self.doc, name, page_number=page_number)
+        except Exception as exc:
+            self.last_error = f"The field could not be removed: {exc}"
+            logger.exception("Deleting a field failed")
+            return False
+        if removed:
+            self.is_modified = True
+        else:
+            self.last_error = "No such field"
+        return removed
+
+    def flatten_form(self) -> Optional[dict]:
+        """Make the filled values part of the page; the form stops being fillable."""
+        from src.engine.forms import flatten
+
+        if self.doc is None:
+            self.last_error = "No document open"
+            return None
+        try:
+            result = flatten(self.doc)
+        except Exception as exc:
+            self.last_error = f"The form could not be flattened: {exc}"
+            logger.exception("Flattening a form failed")
+            return None
+        if result["flattened"]:
+            self.is_modified = True
+            self._refresh_models()
+        return result
+
     # ------------------------------------------------------------- redaction
     def redact_areas(self, areas: Dict[int, List[Tuple[float, float, float, float]]],
                      remove_images: bool = True) -> int:

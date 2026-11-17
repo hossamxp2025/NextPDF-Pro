@@ -41,6 +41,7 @@ MODE_EDIT_TEXT = "edit_text"
 MODE_ADD_TEXT = "add_text"
 MODE_REDACT = "redact"
 MODE_COMMENT = "comment"
+MODE_FIELD = "field"
 
 
 class TextEditOverlay(QFrame):
@@ -446,6 +447,8 @@ class PDFViewer(QWidget):
     #: a note.  The viewer only reports what was drawn; the window writes it.
     comment_drawn = Signal(str, int, object)
     comment_selected = Signal(object)  # the annotation under the click, or None
+    #: (kind, page, rect) — a form field the user drew; the window names it.
+    field_drawn = Signal(str, int, object)
 
     def __init__(self, document, text_editor, page_manager, image_editor, parent=None):
         super().__init__(parent)
@@ -475,6 +478,8 @@ class PDFViewer(QWidget):
         self.pending_redactions: dict = {}
         #: The kind of comment the next drag or click creates, or None.
         self.comment_kind: Optional[str] = None
+        #: The kind of form field the next drag creates, or None.
+        self.field_kind: Optional[str] = None
         #: The annotation the user last clicked on, as the engine describes it.
         self.selected_annotation: Optional[dict] = None
 
@@ -596,6 +601,8 @@ class PDFViewer(QWidget):
             if self.comment_kind == "note":
                 return tr("Comment mode: click where the note belongs")
             return tr("Comment mode: drag over the part you mean")
+        if self._mode == MODE_FIELD:
+            return tr("Field mode: drag where the field belongs")
         return ""
 
     # ---------------------------------------------------------------- rendering
@@ -725,7 +732,7 @@ class PDFViewer(QWidget):
             self.setCursor(QCursor(Qt.ArrowCursor))
         elif mode == MODE_EDIT_TEXT:
             self.setCursor(QCursor(Qt.IBeamCursor))
-        elif mode in (MODE_ADD_TEXT, MODE_REDACT, MODE_COMMENT):
+        elif mode in (MODE_ADD_TEXT, MODE_REDACT, MODE_COMMENT, MODE_FIELD):
             self.setCursor(QCursor(Qt.CrossCursor))
         self.mode_label.setText(self._mode_text())
         if mode == MODE_SELECT and self.inline_editor is not None:
@@ -742,7 +749,14 @@ class PDFViewer(QWidget):
 
     def clear_modes(self):
         self.comment_kind = None
+        self.field_kind = None
         self.set_mode(MODE_SELECT)
+
+    def set_field_mode(self, kind: Optional[str]):
+        """Draw the next form field of *kind*, or leave the mode with None."""
+        self.field_kind = kind
+        self.set_mode(MODE_FIELD if kind else MODE_SELECT)
+        self.mode_label.setText(self._mode_text())
 
     # ------------------------------------------------------------- redaction
     def set_redact_mode(self, enabled: bool):
@@ -873,7 +887,7 @@ class PDFViewer(QWidget):
         self._selecting = True
         self._select_start = pos
         self._select_end = pos
-        if self._mode in (MODE_REDACT, MODE_COMMENT):
+        if self._mode in (MODE_REDACT, MODE_COMMENT, MODE_FIELD):
             return
         point = self.canvas.widget_to_pdf(pos)
         if point is not None:
@@ -902,7 +916,7 @@ class PDFViewer(QWidget):
         if self._selecting and self._select_start is not None:
             self._select_end = pos
             self.canvas._drag_rect = QRectF(self._select_start, pos).normalized()
-            if self._mode in (MODE_REDACT, MODE_COMMENT):
+            if self._mode in (MODE_REDACT, MODE_COMMENT, MODE_FIELD):
                 self.canvas.update()
                 return
             start_pdf = self.canvas.widget_to_pdf(self._select_start)
@@ -951,6 +965,11 @@ class PDFViewer(QWidget):
             return
         if self._mode == MODE_COMMENT:
             self._emit_drawn_comment(rect)
+            return
+        if self._mode == MODE_FIELD:
+            if self.field_kind:
+                self.field_drawn.emit(self.field_kind, self.current_page,
+                                      (rect.x0, rect.y0, rect.x1, rect.y1))
             return
         runs = [
             r for r in self.document.get_text_runs_for_page(self.current_page)

@@ -42,7 +42,9 @@
 | PDFقابل للبحث | Partially Implemented | |
 | التعليقات (تظليل، ملاحظة، نص، أشكال) | Implemented & Tested | تعليقات PDF حقيقية يراها أي قارئ آخر؛ تحديد وتعديل وحذف وقائمة، وتراجع/إعادة لكل عملية. `tests/test_annotations.py` و`tests/test_annotations_ui.py` |
 | نص على الصفحة بالعربية (FreeText) | Not Implemented | مرفوض صراحةً: خطوط PDF القياسية لا تشكّل العربية، والبديل المعروض هو الملاحظة اللاصقة أو محرر النص |
-| النماذج التفاعلية (AcroForms) | Not Implemented | |
+| النماذج التفاعلية (AcroForms) | Implemented & Tested | قراءة الحقول وتعبئتها وحفظها، وإنشاء حقل نص ومربع اختيار وقائمة اختيارات، وحذف حقل، وتثبيت النموذج؛ تراجع/إعادة لكل عملية. `tests/test_forms.py` و`tests/test_forms_ui.py` |
+| قيمة عربية في حقل نص | Implemented with a stated limit | القيمة تُحفظ كما كُتبت تمامًا، لكن الصورة المرسومة داخل الحقل بخطوط PDF القياسية لا تشكّل العربية؛ التثبيت يعيد رسمها بخط يشكّلها |
+| XFA Forms | Not Implemented | النماذج الديناميكية غير مدعومة |
 | التوقيع المرئي | Not Implemented | |
 | التوقيع الرقمي | Not Implemented | |
 | حماية بكلمة مرور | Implemented & Tested | AES-256 بكلمة مرور فتح وكلمة مرور مالك وصلاحيات (طباعة، نسخ، تعديل، تعليقات)؛ `tests/test_protection.py` |

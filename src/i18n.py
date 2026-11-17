@@ -51,6 +51,40 @@ TRANSLATIONS = {
         "Cancelling conversion": "جارٍ إلغاء التحويل",
         "Text formats export logical text, not original layout. SVG requires one selected page. Several pages of PNG, JPEG or WEBP are written as numbered files beside the one you name; TIFF holds them all in one file.": "الصيغ النصية تصدر النص المنطقي لا التخطيط الأصلي. تتطلب SVG صفحة محددة واحدة. وإذا اخترت عدة صفحات بصيغة PNG أو JPEG أو WEBP تُكتب ملفات مرقَّمة بجوار الملف الذي سمّيته، أما TIFF فيضمّها كلها في ملف واحد.",
         "Resolution": "الدقة",
+        # Forms
+        "Forms": "النماذج",
+        "Fill": "تعبئة",
+        "Build": "إنشاء",
+        "Fill the form": "تعبئة النموذج",
+        "Flatten the form": "تثبيت النموذج",
+        "Add a text field": "إضافة حقل نص",
+        "Add a tick box": "إضافة مربع اختيار",
+        "Add a list of choices": "إضافة قائمة اختيارات",
+        "Remove a field": "حذف حقل",
+        "Field name": "اسم الحقل",
+        "Fields": "الحقول",
+        "Filled fields": "الحقول المعبّأة",
+        "Flattened fields": "الحقول المثبَّتة",
+        "Choices": "الاختيارات",
+        "The choices, separated by commas": "الاختيارات مفصولة بفواصل",
+        "A list of choices needs its choices.": "قائمة الاختيارات تحتاج اختياراتها.",
+        "This document has no interactive fields.": "لا توجد حقول تفاعلية في هذا المستند.",
+        "Unnamed field": "حقل بلا اسم",
+        "Nothing was filled": "لم تُعبَّأ أي حقول",
+        "Nothing was flattened": "لم يُثبَّت شيء",
+        "The field could not be added": "تعذّرت إضافة الحقل",
+        "The field could not be removed": "تعذّر حذف الحقل",
+        "Drag where the field belongs": "اسحب في المكان الذي تريد الحقل فيه",
+        "Field mode: drag where the field belongs":
+            "وضع الحقول: اسحب في المكان الذي تريد الحقل فيه",
+        "The values become part of the page and the form stops being fillable. Continue?":
+            "القيم ستصبح جزءًا من الصفحة ولن يعود النموذج قابلًا للتعبئة. أتريد المتابعة؟",
+        "An Arabic value is stored exactly as you type it, but the picture "
+        "drawn inside the field uses the standard PDF fonts, which cannot "
+        "shape Arabic. Flatten the form to have it drawn correctly on the page.":
+            "القيمة العربية تُحفظ كما كتبتها تمامًا، لكن الصورة المرسومة داخل "
+            "الحقل تستخدم خطوط PDF القياسية وهي لا تشكّل العربية. ثبِّت النموذج "
+            "ليُرسم النص على الصفحة بشكل صحيح.",
         # Comments (Review)
         "Comments": "التعليقات",
         "Shapes": "الأشكال",

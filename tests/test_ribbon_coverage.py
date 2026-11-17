@@ -18,6 +18,7 @@ EXPECTED_TABS = [
     ("convert", "Convert PDF", "تحويل PDF"),
     ("create", "Create PDF", "إنشاء PDF"),
     ("ocr", "OCR", "التعرف الضوئي (OCR)"),
+    ("forms", "Forms", "النماذج"),
     ("review", "Review", "مراجعة"),
     ("protect", "Protect and Sign", "حماية وتوقيع"),
     ("view", "View", "عرض"),

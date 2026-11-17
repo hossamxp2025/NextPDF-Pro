@@ -12,7 +12,7 @@ def test_ribbon_selects_real_tool_pages():
         tabs = window.ribbon.findChild(QTabBar)
         stack = window.ribbon.findChild(QStackedWidget)
         assert tabs is not None and stack is not None
-        assert tabs.count() == stack.count() == 11
+        assert tabs.count() == stack.count() == 12
         tabs.setCurrentIndex(3)
         app.processEvents()
         assert stack.currentIndex() == 3
