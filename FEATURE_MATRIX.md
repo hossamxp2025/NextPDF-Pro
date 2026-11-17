@@ -1,4 +1,4 @@
-# مصفوفة الميزات - NextPDF Pro v1.0.0
+# مصفوفة الميزات - NextPDF Pro v1.5.0
 
 | الميزة | الحالة | ملاحظات |
 |--------|--------|---------|
@@ -44,8 +44,11 @@
 | النماذج التفاعلية (AcroForms) | Not Implemented | |
 | التوقيع المرئي | Not Implemented | |
 | التوقيع الرقمي | Not Implemented | |
-| حماية بكلمة مرور | Not Implemented | |
-| Redaction آمن | Not Implemented | |
+| حماية بكلمة مرور | Implemented & Tested | AES-256 بكلمة مرور فتح وكلمة مرور مالك وصلاحيات (طباعة، نسخ، تعديل، تعليقات)؛ `tests/test_protection.py` |
+| فتح ملف محمي بكلمة مرور | Implemented & Tested | ثلاث محاولات مع تمييز «كلمة المرور غلط» |
+| إزالة الحماية | Implemented & Tested | تتطلب طلبًا صريحًا؛ الحفظ العادي يحافظ على التشفير |
+| إزالة بيانات المستند | Implemented & Tested | الميتاداتا و XMP |
+| Redaction آمن | Implemented & Tested | بالنص أو بتحديد منطقة بالسحب؛ المحتوى يُحذف من الصفحة ولا يُغطّى. `tests/test_redaction.py` |
 | PDF to Word (صور صفحات) | Implemented & Tested | المظهر محفوظ، غير قابل للتحرير |
 | PDF to Word (قابل للتحرير) | Implemented & Tested | 1.5.0: جداول Word حقيقية بعروض أعمدة وتظليل، أسماء خطوط من الخط المضمَّن، ترتيب قراءة RTL، صور في مواضعها. المواضع المطلقة لا تُستنسخ |
 | PDF/A | Not Implemented | |

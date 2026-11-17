@@ -18,6 +18,7 @@ try:
 except ImportError:  # pragma: no cover
     import fitz
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QDialog, QInputDialog, QMessageBox
 
 from src.models.document import PDFDocument, permissions_from_flags, FULL_PERMISSIONS
@@ -194,6 +195,104 @@ class RibbonHandlerTests(unittest.TestCase):
         names = ("tool_Protect_with_a_password", "tool_Remove_protection",
                  "tool_Remove_document_information", "tool_Redact_text")
         for name in names:
+            button = self.window.ribbon.findChild(QPushButton, name)
+            self.assertIsNotNone(button, f"{name} is missing from the ribbon")
+            self.assertTrue(button.isEnabled(),
+                            f"{name} is disabled with a document open")
+
+
+class AreaRedactionTests(unittest.TestCase):
+    """Marking rectangles in the viewer and removing what is under them."""
+
+    def setUp(self):
+        app()
+        self.tmp = tempfile.mkdtemp(prefix="nextpdf_redact_area_")
+        self.plain = make_pdf(os.path.join(self.tmp, "plain.pdf"))
+        self.window = MainWindow()
+        self.window._open_file_path(self.plain)
+        self.viewer = self.window.current_context.viewer
+
+    def tearDown(self):
+        for context in list(getattr(self.window, "_contexts", [])):
+            context.document.is_modified = False
+        self.window.close()
+        self.window.deleteLater()
+
+    def text_rect(self):
+        page = self.window.current_document.doc[0]
+        hits = page.search_for(SAMPLE_TEXT)
+        self.assertTrue(hits, "the sample text should be on the page")
+        return hits[0]
+
+    def test_marking_an_area_counts_it_without_changing_the_file(self):
+        self.viewer.mark_redaction(1, self.text_rect())
+        self.assertEqual(self.viewer.pending_redaction_count(), 1)
+        self.assertIn(SAMPLE_TEXT,
+                      self.window.current_document.doc[0].get_text())
+
+    def test_clearing_the_marks_empties_them(self):
+        self.viewer.mark_redaction(1, (10, 10, 60, 40))
+        self.viewer.clear_pending_redactions()
+        self.assertEqual(self.viewer.pending_redaction_count(), 0)
+
+    def test_the_marks_of_the_current_page_are_drawn(self):
+        self.viewer.mark_redaction(1, (10, 10, 60, 40))
+        self.assertEqual(len(self.viewer.canvas._redact_rects), 1)
+
+    def test_the_button_turns_the_mode_on_and_off(self):
+        from src.ui.pdf_viewer import MODE_REDACT, MODE_SELECT
+        self.window._mark_redaction_area()
+        self.assertEqual(self.viewer.current_mode(), MODE_REDACT)
+        self.window._mark_redaction_area()
+        self.assertEqual(self.viewer.current_mode(), MODE_SELECT)
+
+    def test_a_drag_in_hiding_mode_marks_an_area(self):
+        from PySide6.QtCore import QEvent, QPointF
+        from PySide6.QtGui import QMouseEvent
+
+        self.window._mark_redaction_area()
+        rect = self.text_rect()
+        start = self.viewer.canvas.pdf_to_widget(rect).at(0)
+        end = self.viewer.canvas.pdf_to_widget(rect).at(2)
+
+        def press(kind, point):
+            return QMouseEvent(kind, QPointF(point), Qt.LeftButton,
+                               Qt.LeftButton, Qt.NoModifier)
+
+        self.viewer._on_canvas_press(press(QEvent.MouseButtonPress, start))
+        self.viewer._on_canvas_move(press(QEvent.MouseMove, end))
+        self.viewer._on_canvas_release(press(QEvent.MouseButtonRelease, end))
+        self.assertEqual(self.viewer.pending_redaction_count(), 1)
+
+    def test_a_drag_in_hiding_mode_does_not_select_text(self):
+        self.window._mark_redaction_area()
+        self.assertEqual(self.viewer.get_selected_runs(), [])
+
+    def test_applying_removes_the_text_under_the_area(self):
+        self.viewer.mark_redaction(1, self.text_rect())
+        self.window._apply_marked_redactions()
+        self.assertNotIn(SAMPLE_TEXT,
+                         self.window.current_document.doc[0].get_text())
+        self.assertEqual(self.viewer.pending_redaction_count(), 0)
+
+    def test_applying_with_nothing_marked_says_so(self):
+        shown = []
+        QMessageBox.information = staticmethod(
+            lambda *a, **k: shown.append(a[2] if len(a) > 2 else ""))
+        self.window._apply_marked_redactions()
+        self.assertTrue(shown)
+        self.assertIn(SAMPLE_TEXT,
+                      self.window.current_document.doc[0].get_text())
+
+    def test_applying_marks_the_document_as_modified(self):
+        self.window.current_document.is_modified = False
+        self.viewer.mark_redaction(1, self.text_rect())
+        self.window._apply_marked_redactions()
+        self.assertTrue(self.window.current_document.is_modified)
+
+    def test_the_hiding_buttons_are_on_the_protect_tab(self):
+        from PySide6.QtWidgets import QPushButton
+        for name in ("tool_Hide_an_area", "tool_Apply_the_hidden_areas"):
             button = self.window.ribbon.findChild(QPushButton, name)
             self.assertIsNotNone(button, f"{name} is missing from the ribbon")
             self.assertTrue(button.isEnabled(),

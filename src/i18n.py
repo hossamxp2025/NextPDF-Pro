@@ -272,6 +272,14 @@ TRANSLATIONS = {
             "سيُحذف النص من الملف ولن يُغطّى فقط.",
         "Nothing matched that text.": "لا يوجد ما يطابق هذا النص.",
         "Removed areas": "المواضع المحذوفة",
+        "Hide an area": "إخفاء منطقة",
+        "Apply the hidden areas": "تنفيذ الإخفاء",
+        "Hiding mode: drag over what should be removed":
+            "وضع الإخفاء: اسحب فوق ما تريد حذفه",
+        "Drag over what should be removed, then apply.":
+            "اسحب فوق ما تريد حذفه ثم نفّذ الإخفاء.",
+        "Mark an area on the page first.": "حدّد منطقة على الصفحة أولًا.",
+        "Redaction failed": "فشل الإخفاء",
         "Save the protected file as": "احفظ الملف المحمي باسم",
         # About
         "About NextPDF Pro": "حول NextPDF Pro",

@@ -35,7 +35,7 @@ from src.ui.components import (
     ModernButton, ModernIconButton, Card, RibbonGroup,
     EmptyState, PropertiesPanel, ThumbnailPanel, ThumbnailItem
 )
-from src.ui.pdf_viewer import PDFViewer
+from src.ui.pdf_viewer import PDFViewer, MODE_REDACT
 from src.ui.ribbon import Ribbon
 
 logger = logging.getLogger("NextPDF")
@@ -226,7 +226,10 @@ class MainWindow(QMainWindow):
                 ("Remove protection", self._remove_protection, "protect_remove", True),
                 ("Remove document information", self._strip_document_information,
                  "metadata_clean", True),
-                ("Redact text", self._redact_text, "redact", True)])])
+                ("Redact text", self._redact_text, "redact", True),
+                ("Hide an area", self._mark_redaction_area, "redact_area", True),
+                ("Apply the hidden areas", self._apply_marked_redactions,
+                 "redact_apply", True)])])
         ribbon.add_page("view", "View", groups=[
             ("Zoom", [
                 ("Zoom In", self._zoom_in, "view_zoom_in", True),
@@ -674,6 +677,44 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("Redact text"),
                                     tr("Nothing matched that text."))
             return
+        self._refresh_current_view()
+        self.status_label.setText(f"{tr('Removed areas')}: {removed}")
+
+    def _mark_redaction_area(self):
+        """Let the user drag rectangles over what should be removed."""
+        tr = get_translator().tr
+        viewer = getattr(self.current_context, "viewer", None)
+        if viewer is None:
+            return
+        turning_on = viewer.current_mode() != MODE_REDACT
+        viewer.set_redact_mode(turning_on)
+        if turning_on:
+            self.status_label.setText(
+                tr("Drag over what should be removed, then apply."))
+        else:
+            self.status_label.setText("")
+
+    def _apply_marked_redactions(self):
+        """Remove the marked areas from the page content."""
+        tr = get_translator().tr
+        document = self.current_document
+        viewer = getattr(self.current_context, "viewer", None)
+        if document is None or viewer is None:
+            return
+        areas = {page: list(rects)
+                 for page, rects in viewer.pending_redactions.items() if rects}
+        if not areas:
+            QMessageBox.information(self, tr("Hide an area"),
+                                    tr("Mark an area on the page first."))
+            return
+        removed = document.redact_areas(areas)
+        if not removed:
+            QMessageBox.critical(self, tr("Error"),
+                                 f"{tr('Redaction failed')}: "
+                                 f"{document.last_error or ''}")
+            return
+        viewer.clear_pending_redactions()
+        viewer.set_redact_mode(False)
         self._refresh_current_view()
         self.status_label.setText(f"{tr('Removed areas')}: {removed}")
 

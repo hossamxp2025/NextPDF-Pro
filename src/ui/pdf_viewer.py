@@ -39,6 +39,7 @@ PAGE_MARGIN = 16         # canvas margin around the page, in logical pixels
 MODE_SELECT = "select"
 MODE_EDIT_TEXT = "edit_text"
 MODE_ADD_TEXT = "add_text"
+MODE_REDACT = "redact"
 
 
 class TextEditOverlay(QFrame):
@@ -292,6 +293,7 @@ class PageCanvas(QWidget):
         self._scale = VIEW_DPI / 72.0
         self._selection_rects: List[tuple] = []   # PDF bboxes
         self._search_rects: List[tuple] = []      # PDF bboxes
+        self._redact_rects: List[tuple] = []      # PDF bboxes marked for removal
         self._drag_rect: Optional[QRectF] = None
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
@@ -364,6 +366,10 @@ class PageCanvas(QWidget):
         self._search_rects = []
         self.update()
 
+    def set_redact_rects(self, bboxes: List[tuple]):
+        self._redact_rects = list(bboxes or [])
+        self.update()
+
     # ----------------------------------------------------------------- paint
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -399,6 +405,12 @@ class PageCanvas(QWidget):
             painter.setPen(QPen(QColor("#2563EB"), 2))
             painter.setBrush(QColor(37, 99, 235, 60))
             painter.drawPolygon(poly)
+        # areas marked for removal: drawn the way they will be written
+        for bbox in self._redact_rects:
+            poly = self.pdf_to_widget(bbox)
+            painter.setPen(QPen(QColor("#DC2626"), 2))
+            painter.setBrush(QColor(0, 0, 0, 210))
+            painter.drawPolygon(poly)
         # drag rectangle
         if self._drag_rect is not None:
             painter.setPen(QPen(QColor("#2563EB"), 1, Qt.DashLine))
@@ -417,6 +429,7 @@ class PDFViewer(QWidget):
     add_text_committed = Signal(object)
     edit_text_committed = Signal(object)
     search_navigate = Signal(int)  # direction -1/+1
+    redaction_marked = Signal(int)  # how many areas are marked in total
 
     def __init__(self, document, text_editor, page_manager, image_editor, parent=None):
         super().__init__(parent)
@@ -441,6 +454,9 @@ class PDFViewer(QWidget):
         self._selected_runs: List[object] = []
         self._pixmap_cache = {}
         self.inline_editor: Optional[TextEditOverlay] = None
+        #: Areas the user marked for removal, as {1-based page: [pdf bbox]}.
+        #: Nothing is written until the window applies them.
+        self.pending_redactions: dict = {}
 
         self._setup_ui()
         self.retranslate_ui()
@@ -554,6 +570,8 @@ class PDFViewer(QWidget):
             return tr("Text editing mode: click a text line to edit")
         if self._mode == MODE_ADD_TEXT:
             return tr("Add text mode: click on the page to place text")
+        if self._mode == MODE_REDACT:
+            return tr("Hiding mode: drag over what should be removed")
         return ""
 
     # ---------------------------------------------------------------- rendering
@@ -587,6 +605,7 @@ class PDFViewer(QWidget):
             self.zoom_label_btn.setText(f"{self.zoom_level}%")
             self.canvas.set_selection([])
             self.canvas.clear_search()
+            self._show_pending_redactions()
             self.page_changed.emit(page_number)
         except Exception:
             logger.exception("Failed to render page %d", page_number)
@@ -682,7 +701,7 @@ class PDFViewer(QWidget):
             self.setCursor(QCursor(Qt.ArrowCursor))
         elif mode == MODE_EDIT_TEXT:
             self.setCursor(QCursor(Qt.IBeamCursor))
-        elif mode == MODE_ADD_TEXT:
+        elif mode in (MODE_ADD_TEXT, MODE_REDACT):
             self.setCursor(QCursor(Qt.CrossCursor))
         self.mode_label.setText(self._mode_text())
         if mode == MODE_SELECT and self.inline_editor is not None:
@@ -699,6 +718,32 @@ class PDFViewer(QWidget):
 
     def clear_modes(self):
         self.set_mode(MODE_SELECT)
+
+    # ------------------------------------------------------------- redaction
+    def set_redact_mode(self, enabled: bool):
+        """Turn area marking on or off.  Turning it off keeps the marks."""
+        self.set_mode(MODE_REDACT if enabled else MODE_SELECT)
+
+    def mark_redaction(self, page_number: int, bbox) -> int:
+        """Mark one area on *page_number* (1-based).  Returns the total."""
+        rect = tuple(float(v) for v in fitz.Rect(bbox))
+        self.pending_redactions.setdefault(int(page_number), []).append(rect)
+        self._show_pending_redactions()
+        total = self.pending_redaction_count()
+        self.redaction_marked.emit(total)
+        return total
+
+    def pending_redaction_count(self) -> int:
+        return sum(len(v) for v in self.pending_redactions.values())
+
+    def clear_pending_redactions(self):
+        self.pending_redactions = {}
+        self.canvas.set_redact_rects([])
+        self.redaction_marked.emit(0)
+
+    def _show_pending_redactions(self):
+        self.canvas.set_redact_rects(
+            self.pending_redactions.get(self.current_page, []))
 
     # ------------------------------------------------------------- selection
     def get_selected_run(self):
@@ -774,6 +819,8 @@ class PDFViewer(QWidget):
         self._selecting = True
         self._select_start = pos
         self._select_end = pos
+        if self._mode == MODE_REDACT:
+            return
         point = self.canvas.widget_to_pdf(pos)
         if point is not None:
             run = self.text_editor.select_text_at_position(self.current_page, point.x, point.y)
@@ -798,6 +845,9 @@ class PDFViewer(QWidget):
         if self._selecting and self._select_start is not None:
             self._select_end = pos
             self.canvas._drag_rect = QRectF(self._select_start, pos).normalized()
+            if self._mode == MODE_REDACT:
+                self.canvas.update()
+                return
             start_pdf = self.canvas.widget_to_pdf(self._select_start)
             end_pdf = self.canvas.widget_to_pdf(pos)
             if start_pdf and end_pdf:
@@ -838,6 +888,9 @@ class PDFViewer(QWidget):
             max(start_pdf.x, end_pdf.x), max(start_pdf.y, end_pdf.y),
         )
         if rect.width < 2 and rect.height < 2:
+            return
+        if self._mode == MODE_REDACT:
+            self.mark_redaction(self.current_page, rect)
             return
         runs = [
             r for r in self.document.get_text_runs_for_page(self.current_page)
