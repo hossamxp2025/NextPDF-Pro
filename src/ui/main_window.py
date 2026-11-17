@@ -35,7 +35,7 @@ from src.ui.components import (
     ModernButton, ModernIconButton, Card, RibbonGroup,
     EmptyState, PropertiesPanel, ThumbnailPanel, ThumbnailItem
 )
-from src.ui.pdf_viewer import PDFViewer, MODE_REDACT
+from src.ui.pdf_viewer import PDFViewer, MODE_REDACT, MODE_COMMENT
 from src.ui.ribbon import Ribbon
 
 logger = logging.getLogger("NextPDF")
@@ -221,7 +221,27 @@ class MainWindow(QMainWindow):
         ribbon.add_page("ocr", "OCR", groups=[
             ("Recognition", [("OCR", self._run_ocr, "ocr_scan", True)])])
         ribbon.add_page("review", "Review", groups=[
-            ("Comments", [("Review unavailable", None, "review", False)])])
+            ("Comments", [
+                ("Highlight", lambda: self._comment_mode("highlight"),
+                 "comment_highlight", True),
+                ("Sticky note", lambda: self._comment_mode("note"),
+                 "comment_note", True),
+                ("Text on the page", lambda: self._comment_mode("free_text"),
+                 "comment_text", True)]),
+            ("Shapes", [
+                ("Rectangle", lambda: self._comment_mode("rectangle"),
+                 "shape_rectangle", True),
+                ("Ellipse", lambda: self._comment_mode("ellipse"),
+                 "shape_ellipse", True),
+                ("Line", lambda: self._comment_mode("line"),
+                 "shape_line", True)]),
+            ("Manage", [
+                ("Edit the comment", self._edit_selected_comment,
+                 "comment_edit", True),
+                ("Delete the comment", self._delete_selected_comment,
+                 "comment_delete", True),
+                ("List the comments", self._list_comments,
+                 "comment_list", True)])])
         ribbon.add_page("protect", "Protect and Sign", groups=[
             ("Security", [
                 ("Protect with a password", self._protect_document, "protect", True),
@@ -433,6 +453,9 @@ class MainWindow(QMainWindow):
         viewer.page_changed.connect(self._on_page_changed)
         viewer.add_text_committed.connect(lambda payload, c=context: self._commit_text(c, payload, False))
         viewer.edit_text_committed.connect(lambda payload, c=context: self._commit_text(c, payload, True))
+        viewer.comment_drawn.connect(
+            lambda kind, page, payload, c=context:
+            self._commit_comment(c, kind, page, payload))
 
         tab_index = self.tab_widget.addTab(viewer, os.path.basename(file_path))
         self.tab_widget.setCurrentIndex(tab_index)
@@ -719,6 +742,158 @@ class MainWindow(QMainWindow):
         viewer.set_redact_mode(False)
         self._refresh_current_view()
         self.status_label.setText(f"{tr('Removed areas')}: {removed}")
+
+    # ------------------------------------------------------------- comments
+    COMMENT_TITLES = {
+        "highlight": "Highlight",
+        "note": "Sticky note",
+        "free_text": "Text on the page",
+        "rectangle": "Rectangle",
+        "ellipse": "Ellipse",
+        "line": "Line",
+    }
+
+    def _comment_mode(self, kind):
+        """Arm the viewer to draw the next comment of *kind*."""
+        tr = get_translator().tr
+        viewer = getattr(self.current_context, "viewer", None)
+        if viewer is None:
+            return
+        already = (viewer.current_mode() == MODE_COMMENT
+                   and viewer.comment_kind == kind)
+        viewer.set_comment_mode(None if already else kind)
+        if already:
+            self.status_label.setText("")
+            return
+        self.status_label.setText(
+            tr("Click where the note belongs") if kind == "note"
+            else tr("Drag over the part you mean"))
+
+    def _commit_comment(self, context, kind, page, payload):
+        """Write a drawn comment onto the page, through the undo stack."""
+        tr = get_translator().tr
+        document = context.document
+        options = {}
+        if kind == "highlight":
+            options = {"rects": list(payload)}
+        elif kind == "note":
+            text = self._ask_comment_text(tr("Sticky note"))
+            if text is None:
+                return
+            options = {"point": payload, "content": text}
+        elif kind == "free_text":
+            text = self._ask_comment_text(tr("Text on the page"))
+            if text is None:
+                return
+            options = {"rect": payload[0], "text": text}
+        else:
+            options = {"rect": payload[0]}
+        command = PDFSnapshotCommand(
+            document, f"Comment: {kind}",
+            lambda: document.add_comment(page, kind, **options))
+        context.command_stack.push(command)
+        if command.result is None:
+            QMessageBox.warning(self, tr("Comments"),
+                                document.last_error or tr("The comment could "
+                                                          "not be added"))
+            return
+        context.viewer.set_comment_mode(None)
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
+        self.status_label.setText(
+            f"{tr('Comments')}: {len(document.page_annotations(page))}")
+
+    def _ask_comment_text(self, title, existing=""):
+        """Ask for the text of a comment; None when the user cancels."""
+        from PySide6.QtWidgets import QInputDialog
+
+        tr = get_translator().tr
+        text, accepted = QInputDialog.getMultiLineText(
+            self, title, tr("Comment text"), existing)
+        if not accepted or not text.strip():
+            return None
+        return text
+
+    def _selected_comment(self):
+        viewer = getattr(self.current_context, "viewer", None)
+        return getattr(viewer, "selected_annotation", None) if viewer else None
+
+    def _delete_selected_comment(self):
+        tr = get_translator().tr
+        context = self.current_context
+        selected = self._selected_comment()
+        if context is None:
+            return
+        if selected is None:
+            QMessageBox.information(self, tr("Comments"),
+                                    tr("Click a comment on the page first."))
+            return
+        document = context.document
+        page, xref = selected["page"], selected["xref"]
+        command = PDFSnapshotCommand(
+            document, "Delete comment",
+            lambda: document.delete_comment(page, xref))
+        context.command_stack.push(command)
+        if command.result is not True:
+            QMessageBox.warning(self, tr("Comments"),
+                                document.last_error or tr("The comment could "
+                                                          "not be removed"))
+            return
+        context.viewer.clear_annotation_selection()
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
+
+    def _edit_selected_comment(self):
+        tr = get_translator().tr
+        context = self.current_context
+        selected = self._selected_comment()
+        if context is None:
+            return
+        if selected is None:
+            QMessageBox.information(self, tr("Comments"),
+                                    tr("Click a comment on the page first."))
+            return
+        text = self._ask_comment_text(tr("Edit the comment"),
+                                      selected.get("content", ""))
+        if text is None:
+            return
+        document = context.document
+        page, xref = selected["page"], selected["xref"]
+        command = PDFSnapshotCommand(
+            document, "Edit comment",
+            lambda: document.set_comment_text(page, xref, text))
+        context.command_stack.push(command)
+        if command.result is not True:
+            QMessageBox.warning(self, tr("Comments"),
+                                document.last_error or tr("The comment could "
+                                                          "not be changed"))
+            return
+        context.viewer.clear_annotation_selection()
+        context.viewer.refresh_current_page()
+        self._update_window_title()
+
+    def _list_comments(self):
+        """Show every comment in the document, page by page."""
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return
+        items = document.all_annotations()
+        if not items:
+            QMessageBox.information(self, tr("Comments"),
+                                    tr("This document has no comments."))
+            return
+        lines = []
+        for item in items:
+            content = (item.get("content") or "").replace("\n", " ").strip()
+            kind = tr(self.COMMENT_TITLES.get(item["kind"], item["kind"]))
+            line = f"{tr('Page')} {item['page']} — {kind}"
+            if content:
+                line += f": {content[:80]}"
+            lines.append(line)
+        QMessageBox.information(self, tr("Comments"), "\n".join(lines))
 
     # ------------------------------------------------------- document tools
     def _show_properties(self):

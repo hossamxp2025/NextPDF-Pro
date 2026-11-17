@@ -40,7 +40,8 @@
 | OCR عربي | Implemented | محرك مدمج في MuPDF، لا يحتاج تثبيتًا؛ مُتحقق في `tests/test_ocr_integration.py` |
 | OCR إنجليزي | Implemented | محرك مدمج في MuPDF، لا يحتاج تثبيتًا |
 | PDFقابل للبحث | Partially Implemented | |
-| التعليقات (Highlight) | Not Implemented | |
+| التعليقات (تظليل، ملاحظة، نص، أشكال) | Implemented & Tested | تعليقات PDF حقيقية يراها أي قارئ آخر؛ تحديد وتعديل وحذف وقائمة، وتراجع/إعادة لكل عملية. `tests/test_annotations.py` و`tests/test_annotations_ui.py` |
+| نص على الصفحة بالعربية (FreeText) | Not Implemented | مرفوض صراحةً: خطوط PDF القياسية لا تشكّل العربية، والبديل المعروض هو الملاحظة اللاصقة أو محرر النص |
 | النماذج التفاعلية (AcroForms) | Not Implemented | |
 | التوقيع المرئي | Not Implemented | |
 | التوقيع الرقمي | Not Implemented | |

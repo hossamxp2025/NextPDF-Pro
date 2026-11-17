@@ -40,6 +40,7 @@ MODE_SELECT = "select"
 MODE_EDIT_TEXT = "edit_text"
 MODE_ADD_TEXT = "add_text"
 MODE_REDACT = "redact"
+MODE_COMMENT = "comment"
 
 
 class TextEditOverlay(QFrame):
@@ -294,6 +295,7 @@ class PageCanvas(QWidget):
         self._selection_rects: List[tuple] = []   # PDF bboxes
         self._search_rects: List[tuple] = []      # PDF bboxes
         self._redact_rects: List[tuple] = []      # PDF bboxes marked for removal
+        self._annotation_rect = None              # the selected comment's bbox
         self._drag_rect: Optional[QRectF] = None
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
@@ -370,6 +372,10 @@ class PageCanvas(QWidget):
         self._redact_rects = list(bboxes or [])
         self.update()
 
+    def set_annotation_selection(self, bbox):
+        self._annotation_rect = tuple(bbox) if bbox else None
+        self.update()
+
     # ----------------------------------------------------------------- paint
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -411,6 +417,12 @@ class PageCanvas(QWidget):
             painter.setPen(QPen(QColor("#DC2626"), 2))
             painter.setBrush(QColor(0, 0, 0, 210))
             painter.drawPolygon(poly)
+        # the selected comment: outlined, never filled, so it stays readable
+        if self._annotation_rect is not None:
+            poly = self.pdf_to_widget(self._annotation_rect)
+            painter.setPen(QPen(QColor("#7C3AED"), 2, Qt.DashLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawPolygon(poly)
         # drag rectangle
         if self._drag_rect is not None:
             painter.setPen(QPen(QColor("#2563EB"), 1, Qt.DashLine))
@@ -430,6 +442,10 @@ class PDFViewer(QWidget):
     edit_text_committed = Signal(object)
     search_navigate = Signal(int)  # direction -1/+1
     redaction_marked = Signal(int)  # how many areas are marked in total
+    #: (kind, page, payload) — payload is a list of PDF rects, or a point for
+    #: a note.  The viewer only reports what was drawn; the window writes it.
+    comment_drawn = Signal(str, int, object)
+    comment_selected = Signal(object)  # the annotation under the click, or None
 
     def __init__(self, document, text_editor, page_manager, image_editor, parent=None):
         super().__init__(parent)
@@ -457,6 +473,10 @@ class PDFViewer(QWidget):
         #: Areas the user marked for removal, as {1-based page: [pdf bbox]}.
         #: Nothing is written until the window applies them.
         self.pending_redactions: dict = {}
+        #: The kind of comment the next drag or click creates, or None.
+        self.comment_kind: Optional[str] = None
+        #: The annotation the user last clicked on, as the engine describes it.
+        self.selected_annotation: Optional[dict] = None
 
         self._setup_ui()
         self.retranslate_ui()
@@ -572,6 +592,10 @@ class PDFViewer(QWidget):
             return tr("Add text mode: click on the page to place text")
         if self._mode == MODE_REDACT:
             return tr("Hiding mode: drag over what should be removed")
+        if self._mode == MODE_COMMENT:
+            if self.comment_kind == "note":
+                return tr("Comment mode: click where the note belongs")
+            return tr("Comment mode: drag over the part you mean")
         return ""
 
     # ---------------------------------------------------------------- rendering
@@ -701,7 +725,7 @@ class PDFViewer(QWidget):
             self.setCursor(QCursor(Qt.ArrowCursor))
         elif mode == MODE_EDIT_TEXT:
             self.setCursor(QCursor(Qt.IBeamCursor))
-        elif mode in (MODE_ADD_TEXT, MODE_REDACT):
+        elif mode in (MODE_ADD_TEXT, MODE_REDACT, MODE_COMMENT):
             self.setCursor(QCursor(Qt.CrossCursor))
         self.mode_label.setText(self._mode_text())
         if mode == MODE_SELECT and self.inline_editor is not None:
@@ -717,6 +741,7 @@ class PDFViewer(QWidget):
         return self._mode
 
     def clear_modes(self):
+        self.comment_kind = None
         self.set_mode(MODE_SELECT)
 
     # ------------------------------------------------------------- redaction
@@ -740,6 +765,29 @@ class PDFViewer(QWidget):
         self.pending_redactions = {}
         self.canvas.set_redact_rects([])
         self.redaction_marked.emit(0)
+
+    # ---------------------------------------------------------- commenting
+    def set_comment_mode(self, kind: Optional[str]):
+        """Draw the next comment of *kind*, or leave comment mode with None."""
+        self.comment_kind = kind
+        self.set_mode(MODE_COMMENT if kind else MODE_SELECT)
+        self.mode_label.setText(self._mode_text())
+
+    def select_annotation_at(self, x: float, y: float):
+        """Select the comment under a page point, if there is one."""
+        from src.engine.annotations import find_at
+
+        page = self.document.get_page(self.current_page) if self.document else None
+        found = find_at(page, x, y) if page is not None else None
+        self.selected_annotation = found
+        self.canvas.set_annotation_selection(found["rect"] if found else None)
+        self.comment_selected.emit(found)
+        return found
+
+    def clear_annotation_selection(self):
+        self.selected_annotation = None
+        self.canvas.set_annotation_selection(None)
+        self.comment_selected.emit(None)
 
     def _show_pending_redactions(self):
         self.canvas.set_redact_rects(
@@ -816,13 +864,22 @@ class PDFViewer(QWidget):
         if self._mode == MODE_EDIT_TEXT:
             self._begin_edit_at(pos)
             return
+        if self._mode == MODE_COMMENT and self.comment_kind == "note":
+            point = self.canvas.widget_to_pdf(pos)
+            if point is not None:
+                self.comment_drawn.emit("note", self.current_page,
+                                        (point.x, point.y))
+            return
         self._selecting = True
         self._select_start = pos
         self._select_end = pos
-        if self._mode == MODE_REDACT:
+        if self._mode in (MODE_REDACT, MODE_COMMENT):
             return
         point = self.canvas.widget_to_pdf(pos)
         if point is not None:
+            if self.select_annotation_at(point.x, point.y) is not None:
+                self._selecting = False
+                return
             run = self.text_editor.select_text_at_position(self.current_page, point.x, point.y)
             if run is not None:
                 self._select_run(run)
@@ -845,7 +902,7 @@ class PDFViewer(QWidget):
         if self._selecting and self._select_start is not None:
             self._select_end = pos
             self.canvas._drag_rect = QRectF(self._select_start, pos).normalized()
-            if self._mode == MODE_REDACT:
+            if self._mode in (MODE_REDACT, MODE_COMMENT):
                 self.canvas.update()
                 return
             start_pdf = self.canvas.widget_to_pdf(self._select_start)
@@ -892,6 +949,9 @@ class PDFViewer(QWidget):
         if self._mode == MODE_REDACT:
             self.mark_redaction(self.current_page, rect)
             return
+        if self._mode == MODE_COMMENT:
+            self._emit_drawn_comment(rect)
+            return
         runs = [
             r for r in self.document.get_text_runs_for_page(self.current_page)
             if fitz.Rect(r.bbox).intersects(rect)
@@ -903,6 +963,25 @@ class PDFViewer(QWidget):
             self.text_selected.emit(runs[0])
         else:
             self.canvas.set_selection([])
+
+    def _emit_drawn_comment(self, rect):
+        """Report the drawn area as the payload the comment kind needs.
+
+        A highlight follows the text it was dragged over, so the lines that
+        the drag touches are used when there are any; without text under the
+        drag the drawn rectangle itself is used, and nothing is invented.
+        """
+        kind = self.comment_kind
+        if not kind:
+            return
+        payload = [(rect.x0, rect.y0, rect.x1, rect.y1)]
+        if kind == "highlight" and self.document is not None:
+            runs = [r for r in self.document.get_text_runs_for_page(self.current_page)
+                    if fitz.Rect(r.bbox).intersects(rect)]
+            if runs:
+                payload = [tuple(fitz.Rect(run.bbox) & rect) for run in runs
+                           if (fitz.Rect(run.bbox) & rect).get_area() > 0]
+        self.comment_drawn.emit(kind, self.current_page, payload)
 
     # --------------------------------------------------------------- overlays
     def _overlay_parent_rect(self) -> QRect:
@@ -1000,6 +1079,7 @@ class PDFViewer(QWidget):
             self.close_inline_editor()
             self.clear_modes()
             self.canvas.set_selection([])
+            self.clear_annotation_selection()
             return
         if event.key() in (Qt.Key_PageDown, Qt.Key_Down) and event.modifiers() & Qt.ControlModifier:
             self.next_page()

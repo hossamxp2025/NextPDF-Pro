@@ -546,6 +546,95 @@ class PDFDocument:
         self.annotations.setdefault(page_number, []).append(annotation)
         self.is_modified = True
 
+    # ----------------------------------------------------------- annotations
+    # These write real PDF annotations onto the page, so an ordinary save
+    # keeps them and any other reader shows them.  ``self.annotations`` above
+    # is the older in-memory list and is left as it was.
+    def page_annotations(self, page_number: int) -> List[dict]:
+        """Every comment on a page, read from the page itself."""
+        from src.engine.annotations import list_annotations
+
+        page = self.get_page(page_number)
+        return list_annotations(page) if page is not None else []
+
+    def all_annotations(self) -> List[dict]:
+        return [item for number in range(1, self.page_count + 1)
+                for item in self.page_annotations(number)]
+
+    def add_comment(self, page_number: int, kind: str, **options):
+        """Add one comment of *kind* to a page.  Returns it, or None.
+
+        The reason for a refusal is left in ``last_error`` rather than
+        raised at the caller, so the window can show it to the user.
+        """
+        from src.engine import annotations as engine
+
+        page = self.get_page(page_number)
+        if page is None:
+            self.last_error = "No such page"
+            return None
+        try:
+            if kind == engine.KIND_HIGHLIGHT:
+                item = engine.add_highlight(page, **options)
+            elif kind == engine.KIND_NOTE:
+                item = engine.add_note(page, **options)
+            elif kind == engine.KIND_FREE_TEXT:
+                item = engine.add_free_text(page, **options)
+            elif kind in engine.SHAPE_KINDS:
+                item = engine.add_shape(page, kind=kind, **options)
+            else:
+                self.last_error = f"Unknown comment: {kind}"
+                return None
+        except ValueError as exc:
+            self.last_error = str(exc)
+            return None
+        except Exception as exc:
+            self.last_error = f"The comment could not be added: {exc}"
+            logger.exception("Adding an annotation failed")
+            return None
+        self.is_modified = True
+        return item
+
+    def delete_comment(self, page_number: int, xref: int) -> bool:
+        from src.engine.annotations import delete_annotation
+
+        page = self.get_page(page_number)
+        if page is None:
+            self.last_error = "No such page"
+            return False
+        try:
+            removed = delete_annotation(page, int(xref))
+        except Exception as exc:
+            self.last_error = f"The comment could not be removed: {exc}"
+            logger.exception("Deleting an annotation failed")
+            return False
+        if removed:
+            self.is_modified = True
+        else:
+            self.last_error = "That comment is no longer on the page"
+        return removed
+
+    def set_comment_text(self, page_number: int, xref: int, content: str,
+                         author=None) -> bool:
+        from src.engine.annotations import set_content
+
+        page = self.get_page(page_number)
+        if page is None:
+            self.last_error = "No such page"
+            return False
+        try:
+            changed = set_content(page, int(xref), content, author=author)
+        except ValueError as exc:
+            self.last_error = str(exc)
+            return False
+        except Exception as exc:
+            self.last_error = f"The comment could not be changed: {exc}"
+            logger.exception("Editing an annotation failed")
+            return False
+        if changed:
+            self.is_modified = True
+        return changed
+
     # ------------------------------------------------------------- redaction
     def redact_areas(self, areas: Dict[int, List[Tuple[float, float, float, float]]],
                      remove_images: bool = True) -> int:
