@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NextPDF Pro</string>
+
+    <string name="open_document">Open</string>
+    <string name="search">Search</string>
+    <string name="about">About</string>
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="unlock">Unlock</string>
+    <string name="zoom_in">Zoom in</string>
+    <string name="zoom_out">Zoom out</string>
+    <string name="zoom_reset">Fit width</string>
+
+    <string name="welcome_title">No document open</string>
+    <string name="welcome_body">Pick a PDF to read it. The file is opened from where you chose it; nothing is copied anywhere and nothing is sent over the network.</string>
+
+    <string name="opening">Opening…</string>
+    <string name="page_of">Page %1$d of %2$d</string>
+    <string name="zoom_level">%1$d%%</string>
+
+    <string name="password_title">This document is protected</string>
+    <string name="password_body">It needs its open password. %1$d attempts left.</string>
+    <string name="password_wrong">That password was not accepted.</string>
+    <string name="password_hint">Password</string>
+
+    <string name="search_hint">Text to find</string>
+    <string name="search_running">Searching…</string>
+    <string name="search_matches">%1$d matches</string>
+    <string name="search_none">Nothing found</string>
+    <string name="search_jump">Match %1$d</string>
+
+    <string name="failed_unreadable">The file could not be read as a document. It may be damaged, or it may not be a PDF.</string>
+    <string name="failed_too_large">The file is larger than 64 MB. This version reads the whole file into memory, so it refuses a file that big rather than risking being killed mid-read.</string>
+    <string name="failed_wrong_password">Three wrong passwords. The document stays closed.</string>
+    <string name="failed_no_pages">The document opened but reports no pages.</string>
+    <string name="failed_cannot_read">The file could not be read from where it is stored.</string>
+
+    <string name="info_title">Document</string>
+    <string name="info_format">Format</string>
+    <string name="info_pages">Pages</string>
+    <string name="info_encryption">Encryption</string>
+    <string name="info_permissions">Permissions</string>
+    <string name="info_none">none</string>
+    <string name="info_permission_print">printing</string>
+    <string name="info_permission_copy">copying</string>
+    <string name="info_permission_edit">editing</string>
+    <string name="info_permission_annotate">commenting</string>
+
+    <string name="about_version">Version %1$s</string>
+    <string name="about_body">NextPDF Pro for Android, built on the same MuPDF engine as the Windows build, under the GNU AGPL v3.</string>
+    <string name="about_not_yet_title">What this version does NOT do</string>
+    <string name="about_not_yet">This is version 0.1.0 and it is a reader. It does not edit text, does not add comments, does not fill forms, does not stamp, does not encrypt or redact, does not convert to Office formats and does not run OCR. The Windows build does those; this one does not, and nothing here pretends otherwise.\n\nThere is no digital signing, and no visible stamp either — and a visible stamp would not be a digital signature in any case.</string>
+</resources>

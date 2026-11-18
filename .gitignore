@@ -76,6 +76,18 @@ docs/evidence/*.json
 docs/evidence/*.xml
 !docs/evidence/README.md
 
+# Android: machine-specific SDK path, Gradle state and build output
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/.kotlin/
+android/captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
 # Environment
 .env
 .env.local

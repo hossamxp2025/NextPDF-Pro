@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NextPDF Pro</string>
+
+    <string name="open_document">فتح</string>
+    <string name="search">بحث</string>
+    <string name="about">حول</string>
+    <string name="close">إغلاق</string>
+    <string name="cancel">إلغاء</string>
+    <string name="unlock">فتح الحماية</string>
+    <string name="zoom_in">تكبير</string>
+    <string name="zoom_out">تصغير</string>
+    <string name="zoom_reset">ملء العرض</string>
+
+    <string name="welcome_title">لا يوجد مستند مفتوح</string>
+    <string name="welcome_body">اختر ملف PDF لقراءته. الملف يُفتح من مكانه، ولا يُنسخ إلى أي مكان، ولا يُرسل عبر الشبكة.</string>
+
+    <string name="opening">جارٍ الفتح…</string>
+    <string name="page_of">صفحة %1$d من %2$d</string>
+    <string name="zoom_level">%1$d%%</string>
+
+    <string name="password_title">هذا المستند محمي</string>
+    <string name="password_body">يحتاج كلمة مرور الفتح. باقي %1$d محاولات.</string>
+    <string name="password_wrong">كلمة المرور غير مقبولة.</string>
+    <string name="password_hint">كلمة المرور</string>
+
+    <string name="search_hint">النص المطلوب</string>
+    <string name="search_running">جارٍ البحث…</string>
+    <string name="search_matches">%1$d نتيجة</string>
+    <string name="search_none">لا توجد نتائج</string>
+    <string name="search_jump">النتيجة %1$d</string>
+
+    <string name="failed_unreadable">لم يُقرأ الملف كمستند. قد يكون تالفًا، أو ليس ملف PDF.</string>
+    <string name="failed_too_large">حجم الملف أكبر من 64 ميجابايت. هذا الإصدار يقرأ الملف كاملًا في الذاكرة، فيرفض ملفًا بهذا الحجم بدلًا من أن يُقتل في منتصف القراءة.</string>
+    <string name="failed_wrong_password">ثلاث كلمات مرور خاطئة. المستند يبقى مغلقًا.</string>
+    <string name="failed_no_pages">المستند فُتح لكنه لا يُبلّغ عن أي صفحة.</string>
+    <string name="failed_cannot_read">لم يُقرأ الملف من مكان تخزينه.</string>
+
+    <string name="info_title">المستند</string>
+    <string name="info_format">الصيغة</string>
+    <string name="info_pages">الصفحات</string>
+    <string name="info_encryption">التشفير</string>
+    <string name="info_permissions">الصلاحيات</string>
+    <string name="info_none">لا شيء</string>
+    <string name="info_permission_print">الطباعة</string>
+    <string name="info_permission_copy">النسخ</string>
+    <string name="info_permission_edit">التعديل</string>
+    <string name="info_permission_annotate">التعليق</string>
+
+    <string name="about_version">الإصدار %1$s</string>
+    <string name="about_body">NextPDF Pro لأندرويد، مبني على نفس محرك MuPDF المستخدم في نسخة ويندوز، تحت رخصة GNU AGPL v3.</string>
+    <string name="about_not_yet_title">ما لا يفعله هذا الإصدار</string>
+    <string name="about_not_yet">هذا الإصدار 0.1.0 وهو قارئ فقط. لا يحرّر النص، ولا يضيف تعليقات، ولا يعبّئ النماذج، ولا يختم، ولا يشفّر ولا يُخفي، ولا يحوّل إلى صيغ أوفيس، ولا يشغّل التعرف الضوئي. نسخة ويندوز تفعل ذلك، وهذه لا تفعله، ولا شيء هنا يدّعي غير ذلك.\n\nولا يوجد توقيع رقمي، ولا ختم مرئي كذلك — والختم المرئي ليس توقيعًا رقميًا على أي حال.</string>
+</resources>
