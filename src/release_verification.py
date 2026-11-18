@@ -214,6 +214,48 @@ def verify_bands(directory, check):
               'حسام الفاخرة' in text)
         check('forms: nothing fillable is left', not doc.is_form_pdf)
 
+    # ---------------------------------------------------------------- stamps
+    signature = directory / 'band-signature.png'
+    pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 120, 60), False)
+    pixmap.set_rect(pixmap.irect, (255, 255, 255))
+    pixmap.set_rect(fitz.IRect(10, 24, 110, 36), (10, 10, 10))
+    pixmap.save(signature)
+
+    document = PDFDocument()
+    document.load(str(plain))
+    page = document.get_page(1)
+    page.draw_rect(page.rect, color=None, fill=(1, 0, 0))
+    stamp = document.add_image_stamp(1, (60, 300, 460, 500), str(signature),
+                                     drop_white_background=True)
+    check('stamp: the image was placed', bool(stamp))
+    check('stamp: the proportions were kept', bool(stamp) and abs(
+        (stamp['rect'][2] - stamp['rect'][0])
+        / (stamp['rect'][3] - stamp['rect'][1]) - 2.0) < 0.02)
+    named = document.add_text_stamp(1, (60, 560, 460, 620), 'حسام الفاخرة')
+    check('stamp: the typed name was drawn', bool(named))
+    check('stamp: a stray click is refused',
+          document.add_text_stamp(1, (60, 700, 62, 702), 'x') is None)
+    check('stamp: a missing image is refused',
+          document.add_image_stamp(1, (60, 650, 300, 700),
+                                   str(directory / 'no-such-image.png')) is None)
+    stamped = directory / 'band-stamped.pdf'
+    check('stamp: saved', document.save(str(stamped), incremental=False))
+    with fitz.open(stamped) as doc:
+        first = doc[0]
+        check('stamp: the image is in the saved file', len(first.get_images()) == 1)
+        check('stamp: the Arabic name is real searchable text',
+              'حسام الفاخرة' in first.get_text()
+              and bool(first.search_for('الفاخرة')))
+        check('stamp: a stamp is not an annotation and not a field',
+              list(first.annots()) == [] and not doc.is_form_pdf)
+        picture = first.get_pixmap(dpi=72)
+        drawn = fitz.Rect(stamp['rect'])
+        middle = int((drawn.x0 + drawn.x1) / 2)
+        check('stamp: the white background was dropped, the stroke kept',
+              picture.pixel(middle, int(drawn.y0 + drawn.height * 0.1))
+              == (255, 0, 0)
+              and max(picture.pixel(middle, int((drawn.y0 + drawn.y1) / 2))) < 80)
+
     # ------------------------------------------------------------ conversion
     from src.engine.conversion import export_pdf
 

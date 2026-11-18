@@ -1,5 +1,5 @@
 NextPDF Pro
-Version: 1.6.0
-Build: 20261118-1100
-Status: feature release (protection and redaction, conversion completed, comments, interactive forms)
+Version: 1.6.1
+Build: 20261118-0940
+Status: feature release (visible stamp: an image or a typed name on the page; not a digital signature)
 Platform: Windows x64
