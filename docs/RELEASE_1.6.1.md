@@ -112,7 +112,36 @@ not been established:
 - if the uninstaller itself was run and exited, the key should have been
   removed with everything else, and the installer script needs looking at.
 
-Resolving it needs one clean run: install 1.6.1 again, then uninstall through
-`unins000.exe /VERYSILENT /LOG=...`, and read the log and the registry
-afterwards. That has not been done, and the orphaned key is still on the
-machine. No registry key was touched here.
+### The clean run, and the verdict
+
+Run on 2026-11-18 right afterwards, to separate the two: 1.6.1 was installed
+again (`/VERYSILENT /CURRENTUSER`, exit 0, folder and `unins000.exe` back, the
+uninstall entry rewritten), then removed through its own uninstaller,
+`unins000.exe /VERYSILENT /LOG=…`, exit 0.
+
+| After the uninstaller | State |
+|---|---|
+| `%LOCALAPPDATA%\Programs\NextPDF Pro` | gone |
+| Desktop shortcut | gone |
+| Uninstall entry in `HKCU\…\CurrentVersion\Uninstall` | **gone** - the log names it: `Deleting registry key: …\{8F4A1B2C-…}_is1` |
+| Start Menu | nothing |
+| Settings branch under `HKCU\Software` | nothing |
+| Log verdict | `Uninstallation process succeeded.` / `Removed all? Yes` / `Need to restart Windows? No` |
+
+**So the installer is not at fault.** Its uninstaller removes the files, the
+shortcut and its own registry key, and reports removing everything. The
+orphaned key seen before came from the folder being deleted by hand instead,
+which leaves Windows no uninstaller to run - expected behaviour, not a defect.
+The reinstall overwrote that same key and the proper uninstall then removed
+it, so the machine is clean: **nothing of NextPDF Pro is installed now.**
+
+One line in the log worth recording rather than hiding: `Failed to delete
+directory (145). Will retry later.` - error 145 is "directory not empty",
+raised while the uninstaller's own data files were still in place. It retried
+half a second later and the directory went. The outcome is clean; the message
+is a step in the sequence, not a failure.
+
+Evidence: `docs/evidence/reinstall-1.6.1.log` and
+`docs/evidence/uninstall-1.6.1.log` (local; `.log` is git-ignored).
+
+No registry key was edited by hand at any point.
