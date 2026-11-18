@@ -1,5 +1,7 @@
 # NextPDF Pro
 
+![NextPDF Pro 1.6.1 — النافذة الرئيسية في الوضعين النهاري والليلي. البيانات الشخصية في المستند المعروض مطموسة.](docs/screenshots/banner-1.6.1.png)
+
 [![Release](https://img.shields.io/github/v/release/hossamxp2025/NextPDF-Pro?color=2563eb)](https://github.com/hossamxp2025/NextPDF-Pro/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/hossamxp2025/NextPDF-Pro/total?color=16a34a)](https://github.com/hossamxp2025/NextPDF-Pro/releases)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-dc2626)](LICENSE)
