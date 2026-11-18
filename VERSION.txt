@@ -1,5 +1,5 @@
 NextPDF Pro
-Version: 1.5.0
-Build: 20261116-1540
-Status: feature release (Word export rebuilds tables, shading, fonts and reading order)
+Version: 1.6.0
+Build: 20261118-1100
+Status: feature release (protection and redaction, conversion completed, comments, interactive forms)
 Platform: Windows x64

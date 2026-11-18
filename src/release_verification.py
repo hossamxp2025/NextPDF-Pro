@@ -88,6 +88,151 @@ def fixtures(directory):
         doc.save(directory / 'scan.pdf')
 
 
+def verify_bands(directory, check):
+    """Protection, compression, comments and forms, run inside the packaged app.
+
+    These are the features added after 1.5.0.  Each one is exercised against a
+    file written here and then reopened, so what is checked is the saved PDF
+    and not the state left in memory.
+    """
+    from src.models.document import PDFDocument
+    from src.engine import annotations as ann
+    from src.engine.optimizer import compress_pdf
+
+    plain = directory / 'band-source.pdf'
+    with fitz.open() as doc:
+        doc.new_page(width=595, height=842).insert_text((60, 100), 'Protected content')
+        doc.save(plain)
+
+    # ----------------------------------------------------------- protection
+    document = PDFDocument()
+    check('protection: plain file opens', document.load(str(plain)))
+    secured = directory / 'band-protected.pdf'
+    check('protection: saved with AES-256 and permissions',
+          document.save(str(secured), incremental=False, user_password='open-me',
+                        owner_password='own-me',
+                        permissions=int(fitz.PDF_PERM_ACCESSIBILITY)))
+    blind = PDFDocument()
+    check('protection: refused without the password', not blind.load(str(secured)))
+    check('protection: refusal says the file is encrypted', bool(blind.last_error))
+    unlocked = PDFDocument()
+    check('protection: opens with the password', unlocked.load(str(secured), password='open-me'))
+    check('protection: content readable after unlocking',
+          'Protected content' in unlocked.get_page(1).get_text())
+    kept = directory / 'band-protected-resaved.pdf'
+    check('protection: an ordinary save keeps the encryption',
+          unlocked.save(str(kept), incremental=False))
+    with fitz.open(kept) as doc:
+        check('protection: resaved file still needs the password', bool(doc.needs_pass))
+
+    # ------------------------------------------------------------- redaction
+    redacted_source = directory / 'band-redact.pdf'
+    with fitz.open() as doc:
+        page = doc.new_page(width=400, height=200)
+        page.insert_text((40, 60), 'Account 123456789')
+        page.insert_text((40, 120), 'Keep this line')
+        doc.save(redacted_source)
+    document = PDFDocument()
+    document.load(str(redacted_source))
+    applied = document.redact_areas({1: [(35, 45, 260, 70)]})
+    check('redaction: the marked area was applied', applied == 1)
+    redacted = directory / 'band-redacted.pdf'
+    check('redaction: saved', document.save(str(redacted), incremental=False))
+    with fitz.open(redacted) as doc:
+        text = doc[0].get_text()
+        check('redaction: the content is gone, not covered', '123456789' not in text)
+        check('redaction: the rest of the page survived', 'Keep this line' in text)
+
+    # ----------------------------------------------------------- compression
+    scan = directory / 'scan.pdf'
+    smaller = directory / 'band-compressed.pdf'
+    report = compress_pdf(str(scan), str(smaller))
+    check('compression: ran and reported', bool(report))
+    check('compression: the reported sizes are the real ones',
+          report['before'] == scan.stat().st_size
+          and report['after'] == smaller.stat().st_size)
+    check('compression: never writes a bigger file', report['after'] <= report['before'])
+    with fitz.open(smaller) as doc:
+        check('compression: the result still opens and keeps its page',
+              doc.page_count == 1)
+
+    # -------------------------------------------------------------- comments
+    document = PDFDocument()
+    document.load(str(plain))
+    highlight = document.add_comment(1, ann.KIND_HIGHLIGHT,
+                                    rects=[(58, 88, 240, 104)], content='looked at')
+    note = document.add_comment(1, ann.KIND_NOTE, point=(320, 100),
+                                content='ملاحظة عربية')
+    shape = document.add_comment(1, ann.KIND_RECTANGLE, rect=(60, 200, 300, 260))
+    check('comments: highlight added', bool(highlight))
+    check('comments: sticky note added', bool(note))
+    check('comments: shape added', bool(shape))
+    refused = document.add_comment(1, ann.KIND_FREE_TEXT,
+                                   rect=(60, 300, 300, 340), text='مرحبا بالعالم')
+    check('comments: Arabic free text refused, with a reason',
+          refused is None and bool(document.last_error))
+    commented = directory / 'band-commented.pdf'
+    check('comments: saved', document.save(str(commented), incremental=False))
+    reread = PDFDocument()
+    reread.load(str(commented))
+    items = reread.page_annotations(1)
+    check('comments: all three read back from the saved file',
+          sorted(item['kind'] for item in items) == ['highlight', 'note', 'rectangle'])
+    check('comments: the Arabic note text is stored as typed',
+          any(item['content'] == 'ملاحظة عربية' for item in items))
+    removed = reread.delete_comment(1, items[0]['xref'])
+    check('comments: one can be deleted', removed and len(reread.page_annotations(1)) == 2)
+
+    # ----------------------------------------------------------------- forms
+    document = PDFDocument()
+    document.load(str(plain))
+    field = document.add_form_field(1, (60, 300, 300, 326), 'full_name', kind='text')
+    check('forms: text field created', bool(field))
+    check('forms: a duplicate name is refused',
+          document.add_form_field(1, (60, 340, 300, 366), 'full_name') is None)
+    check('forms: a list without choices is refused',
+          document.add_form_field(1, (60, 380, 300, 406), 'city', kind='dropdown') is None)
+    result = document.set_field_value('full_name', 'حسام الفاخرة')
+    check('forms: the Arabic value is stored', result['stored'])
+    check('forms: the broken appearance is declared, not hidden',
+          result['appearance_ok'] is False)
+    form_path = directory / 'band-form.pdf'
+    check('forms: saved', document.save(str(form_path), incremental=False))
+    reread = PDFDocument()
+    reread.load(str(form_path))
+    check('forms: the saved file is a form', reread.has_form())
+    check('forms: the value is exact after reopening',
+          [item['value'] for item in reread.form_fields()] == ['حسام الفاخرة'])
+    flat = reread.flatten_form()
+    check('forms: flattened, and the Arabic value was redrawn',
+          bool(flat) and flat['flattened'] == 1 and flat['redrawn'] == 1)
+    flat_path = directory / 'band-form-flat.pdf'
+    check('forms: the flattened file saved', reread.save(str(flat_path), incremental=False))
+    with fitz.open(flat_path) as doc:
+        text = doc[0].get_text()
+        check('forms: the flattened value is real, shaped page text',
+              'حسام الفاخرة' in text)
+        check('forms: nothing fillable is left', not doc.is_form_pdf)
+
+    # ------------------------------------------------------------ conversion
+    from src.engine.conversion import export_pdf
+
+    source_bytes = plain.read_bytes()
+    markdown = directory / 'band-export.md'
+    export_pdf(source_bytes, str(markdown), [1], 'md')
+    check('conversion: Markdown written', markdown.is_file())
+    check('conversion: the Markdown carries the page text',
+          'Protected content' in markdown.read_text(encoding='utf-8'))
+    with fitz.open() as doc:
+        doc.new_page(width=200, height=200).insert_text((20, 40), 'one')
+        doc.new_page(width=200, height=200).insert_text((20, 40), 'two')
+        two_pages = doc.tobytes()
+    images = directory / 'band-pages.png'
+    export_pdf(two_pages, str(images), [1, 2], 'png', dpi=120)
+    produced = sorted(p.name for p in directory.glob('band-pages*.png'))
+    check('conversion: one numbered image file per page', len(produced) == 2)
+
+
 def run(evidence_path):
     directory = Path(evidence_path).resolve()
     directory.mkdir(parents=True, exist_ok=True)
@@ -155,6 +300,7 @@ def run(evidence_path):
         check('application icon loaded', not window.windowIcon().isNull())
         window.windowIcon().pixmap(256, 256).save(str(directory / 'window-icon.png'))
         check('bundled icon resource', (ICONS_DIR / 'NextPDF-Pro.ico').is_file())
+        verify_bands(directory, check)
     except Exception:
         logging.exception('Release verification failed')
         checks.append({'name': 'verification exception; see application.log', 'status': 'FAIL'})

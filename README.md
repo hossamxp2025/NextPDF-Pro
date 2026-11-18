@@ -17,13 +17,19 @@ NextPDF Pro is a professional, open-source PDF editor for Windows, designed for 
 - **Searchable Arabic OCR** – Convert scanned images to searchable PDFs using Tesseract (Arabic, English, and mixed)
 - **PDF Creation** – Create PDFs from images, text, DOCX, XLSX, PPTX, HTML, CSV; merge multiple images into one PDF
 - **Office Conversions** – Export PDF to editable DOCX, PPTX, XLSX with Arabic RTL support
-- **Ribbon Interface** – 11 tabs in Arabic and English, with tinted SVG icons and tooltips
+- **Ribbon Interface** – 12 tabs in Arabic and English, with tinted SVG icons and tooltips
 - **Theming** – Light, Dark, and System themes with live switching (no document impact)
 - **Localization** – Full Arabic/English UI with RTL layout; no mixed labels
 - **Portable OCR, no separate engine** – Recognition runs on the Tesseract compiled into MuPDF, so the release ships only 5 MB of `ara`/`eng` language data instead of a 175 MB Tesseract runtime; no system installation required
 - **Zoom** – Real QSlider zoom (10–800%) synced across views
 - **Damaged text repair** – A PDF whose embedded font has no `ToUnicode` map is repaired from the font's own character map, or refused with a clear message; it is never exported as garbage
 - **Borderless statement tables** – Tables drawn only with shading are detected from text alignment, keep real dates and amounts, and keep Arabic column order
+- **Protection** – AES-256 encryption with an open password and an owner password, reader permissions, opening protected files, removing protection on an explicit request, and clearing document data. An ordinary save never drops the protection
+- **Redaction** – The marked content is removed from the page, not covered over, by text or by dragging an area in the viewer
+- **Comments** – Highlight, sticky note, text on the page, rectangle, ellipse and line, written as real PDF annotations any other reader sees; selecting, editing, deleting and a list of them all, each step undoable. Arabic in a FreeText comment is refused, because the standard PDF fonts cannot shape it
+- **Interactive forms** – Read, fill and save AcroForm fields; create a text field, a tick box or a list of choices; delete a field; flatten the form. An Arabic value is stored exactly as typed, and flattening redraws it with a font that shapes it
+- **Compression** – Removes what the file does not need and recompresses images, reporting the size before and after; if nothing was saved it says so and never writes a larger file
+- **Finished conversion** – Export resolution (72–600 DPI), real Markdown with headings and tables, numbered image files for a page range, automatic recognition for a scanned page with the output marked as recognised, plus Print and Document properties
 
 ## Screenshots
 

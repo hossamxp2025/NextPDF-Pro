@@ -1,9 +1,9 @@
-# مصفوفة الميزات - NextPDF Pro v1.5.0
+# مصفوفة الميزات - NextPDF Pro v1.6.0
 
 | الميزة | الحالة | ملاحظات |
 |--------|--------|---------|
 | واجهة حديثة (Modern Dark Theme) | Implemented & Tested | QSS احترافي مع ألوان مريحة |
-| Ribbon Toolbar بتبويبات | Implemented & Tested | Home, Edit PDF, Organize Pages, Insert, Convert, OCR, Review, Sign, Protect, View |
+| Ribbon Toolbar بتبويبات | Implemented & Tested | 12 تبويبًا: Home, Edit PDF, Insert, Organize Pages, Convert PDF, Create PDF, OCR, Forms, Review, Protect and Sign, View, Settings |
 | أزرار احترافية مع أيقونات | Implemented & Tested | ModernButton مع hover/pressed/disabled states |
 | اللوحة اليسرى - الصور المصغرة | Implemented & Tested | ThumbnailPanel مع Cards للصفحات |
 | اللوحة اليمنى - الخصائص | Implemented & Tested | PropertiesPanel مع Empty State |
