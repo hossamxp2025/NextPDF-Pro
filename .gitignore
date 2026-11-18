@@ -105,6 +105,10 @@ docs/evidence/_*
 /build/_probe_create_report.txt
 /docs/evidence/1.2.1-*/
 /docs/evidence/verify-1.4.1/
+/docs/evidence/verify-1.6.0/
+/docs/evidence/verify-1.6.0-installed/
+/docs/evidence/verify-1.6.1/
+/docs/evidence/verify-1.6.1-installed/
 /docs/evidence/selftest-1.4.1.txt
 /docs/evidence/ocr_verified_20261114_211808/
 /docs/evidence/font_3.ttf
