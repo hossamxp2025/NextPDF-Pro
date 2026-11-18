@@ -723,6 +723,51 @@ class PDFDocument:
             self._refresh_models()
         return result
 
+    # ---------------------------------------------------------------- stamps
+    def add_image_stamp(self, page_number: int, rect, image, **options):
+        """Place a picture on the page as page content.  Returns it, or None.
+
+        This is a visible stamp, not a digital signature: see
+        ``src/engine/stamps.py``.
+        """
+        from src.engine.stamps import add_image_stamp
+
+        page = self.get_page(page_number)
+        if page is None:
+            self.last_error = "No such page"
+            return None
+        try:
+            stamp = add_image_stamp(page, rect, image, **options)
+        except ValueError as exc:
+            self.last_error = str(exc)
+            return None
+        except Exception as exc:
+            self.last_error = f"The stamp could not be placed: {exc}"
+            logger.exception("Placing an image stamp failed")
+            return None
+        self.is_modified = True
+        return stamp
+
+    def add_text_stamp(self, page_number: int, rect, text: str, **options):
+        """Draw text on the page as page content.  Returns it, or None."""
+        from src.engine.stamps import add_text_stamp
+
+        page = self.get_page(page_number)
+        if page is None:
+            self.last_error = "No such page"
+            return None
+        try:
+            stamp = add_text_stamp(page, rect, text, **options)
+        except ValueError as exc:
+            self.last_error = str(exc)
+            return None
+        except Exception as exc:
+            self.last_error = f"The stamp could not be placed: {exc}"
+            logger.exception("Placing a text stamp failed")
+            return None
+        self.is_modified = True
+        return stamp
+
     # ------------------------------------------------------------- redaction
     def redact_areas(self, areas: Dict[int, List[Tuple[float, float, float, float]]],
                      remove_images: bool = True) -> int:

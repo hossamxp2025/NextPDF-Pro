@@ -42,6 +42,7 @@ MODE_ADD_TEXT = "add_text"
 MODE_REDACT = "redact"
 MODE_COMMENT = "comment"
 MODE_FIELD = "field"
+MODE_STAMP = "stamp"
 
 
 class TextEditOverlay(QFrame):
@@ -449,6 +450,8 @@ class PDFViewer(QWidget):
     comment_selected = Signal(object)  # the annotation under the click, or None
     #: (kind, page, rect) — a form field the user drew; the window names it.
     field_drawn = Signal(str, int, object)
+    # kind ("image" | "text"), 1-based page, (x0, y0, x1, y1)
+    stamp_drawn = Signal(str, int, object)
 
     def __init__(self, document, text_editor, page_manager, image_editor, parent=None):
         super().__init__(parent)
@@ -480,6 +483,7 @@ class PDFViewer(QWidget):
         self.comment_kind: Optional[str] = None
         #: The kind of form field the next drag creates, or None.
         self.field_kind: Optional[str] = None
+        self.stamp_kind: Optional[str] = None
         #: The annotation the user last clicked on, as the engine describes it.
         self.selected_annotation: Optional[dict] = None
 
@@ -603,6 +607,8 @@ class PDFViewer(QWidget):
             return tr("Comment mode: drag over the part you mean")
         if self._mode == MODE_FIELD:
             return tr("Field mode: drag where the field belongs")
+        if self._mode == MODE_STAMP:
+            return tr("Stamp mode: drag where the stamp belongs")
         return ""
 
     # ---------------------------------------------------------------- rendering
@@ -732,7 +738,8 @@ class PDFViewer(QWidget):
             self.setCursor(QCursor(Qt.ArrowCursor))
         elif mode == MODE_EDIT_TEXT:
             self.setCursor(QCursor(Qt.IBeamCursor))
-        elif mode in (MODE_ADD_TEXT, MODE_REDACT, MODE_COMMENT, MODE_FIELD):
+        elif mode in (MODE_ADD_TEXT, MODE_REDACT, MODE_COMMENT, MODE_FIELD,
+                      MODE_STAMP):
             self.setCursor(QCursor(Qt.CrossCursor))
         self.mode_label.setText(self._mode_text())
         if mode == MODE_SELECT and self.inline_editor is not None:
@@ -750,12 +757,19 @@ class PDFViewer(QWidget):
     def clear_modes(self):
         self.comment_kind = None
         self.field_kind = None
+        self.stamp_kind = None
         self.set_mode(MODE_SELECT)
 
     def set_field_mode(self, kind: Optional[str]):
         """Draw the next form field of *kind*, or leave the mode with None."""
         self.field_kind = kind
         self.set_mode(MODE_FIELD if kind else MODE_SELECT)
+        self.mode_label.setText(self._mode_text())
+
+    def set_stamp_mode(self, kind: Optional[str]):
+        """Draw the area for the next stamp of *kind*, or leave with None."""
+        self.stamp_kind = kind
+        self.set_mode(MODE_STAMP if kind else MODE_SELECT)
         self.mode_label.setText(self._mode_text())
 
     # ------------------------------------------------------------- redaction
@@ -887,7 +901,7 @@ class PDFViewer(QWidget):
         self._selecting = True
         self._select_start = pos
         self._select_end = pos
-        if self._mode in (MODE_REDACT, MODE_COMMENT, MODE_FIELD):
+        if self._mode in (MODE_REDACT, MODE_COMMENT, MODE_FIELD, MODE_STAMP):
             return
         point = self.canvas.widget_to_pdf(pos)
         if point is not None:
@@ -916,7 +930,7 @@ class PDFViewer(QWidget):
         if self._selecting and self._select_start is not None:
             self._select_end = pos
             self.canvas._drag_rect = QRectF(self._select_start, pos).normalized()
-            if self._mode in (MODE_REDACT, MODE_COMMENT, MODE_FIELD):
+            if self._mode in (MODE_REDACT, MODE_COMMENT, MODE_FIELD, MODE_STAMP):
                 self.canvas.update()
                 return
             start_pdf = self.canvas.widget_to_pdf(self._select_start)
@@ -969,6 +983,11 @@ class PDFViewer(QWidget):
         if self._mode == MODE_FIELD:
             if self.field_kind:
                 self.field_drawn.emit(self.field_kind, self.current_page,
+                                      (rect.x0, rect.y0, rect.x1, rect.y1))
+            return
+        if self._mode == MODE_STAMP:
+            if self.stamp_kind:
+                self.stamp_drawn.emit(self.stamp_kind, self.current_page,
                                       (rect.x0, rect.y0, rect.x1, rect.y1))
             return
         runs = [

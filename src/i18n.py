@@ -51,6 +51,28 @@ TRANSLATIONS = {
         "Cancelling conversion": "جارٍ إلغاء التحويل",
         "Text formats export logical text, not original layout. SVG requires one selected page. Several pages of PNG, JPEG or WEBP are written as numbered files beside the one you name; TIFF holds them all in one file.": "الصيغ النصية تصدر النص المنطقي لا التخطيط الأصلي. تتطلب SVG صفحة محددة واحدة. وإذا اخترت عدة صفحات بصيغة PNG أو JPEG أو WEBP تُكتب ملفات مرقَّمة بجوار الملف الذي سمّيته، أما TIFF فيضمّها كلها في ملف واحد.",
         "Resolution": "الدقة",
+        # Visible stamp
+        "Visible stamp": "ختم مرئي",
+        "Stamp an image": "ختم بصورة",
+        "Stamp a name": "ختم باسم",
+        "What a stamp is not": "ما لا يفعله الختم",
+        "A visible stamp is a picture or text placed on the page. It is not a digital signature: it does not prove who placed it and it cannot detect a later change to the file. Digital signing is not available yet.":
+            "الختم المرئي صورة أو نص يوضع على الصفحة. وهو ليس توقيعًا رقميًا: لا يثبت من وضعه، ولا يكشف تغييرًا يحدث للملف بعده. التوقيع الرقمي غير متاح بعد.",
+        "Drag where the stamp belongs": "اسحب في المكان الذي تريد الختم فيه",
+        "Stamp mode: drag where the stamp belongs":
+            "وضع الختم: اسحب في المكان الذي تريد الختم فيه",
+        "Choose the stamp image": "اختر صورة الختم",
+        "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)":
+            "الصور (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)",
+        "Make the white background of the image transparent?":
+            "أجعل خلفية الصورة البيضاء شفافة؟",
+        "The text of the stamp": "نص الختم",
+        "The stamp was placed.": "تم وضع الختم.",
+        "The stamp could not be placed": "تعذّر وضع الختم",
+        "The stamp area is too small": "منطقة الختم صغيرة جدًا",
+        "The image file was not found": "ملف الصورة غير موجود",
+        "The image could not be read": "تعذّر قراءة الصورة",
+        "The stamp needs its text": "الختم يحتاج نصه",
         # Forms
         "Forms": "النماذج",
         "Fill": "تعبئة",

@@ -29,6 +29,7 @@ NextPDF Pro is a professional, open-source PDF editor for Windows, designed for 
 - **Comments** – Highlight, sticky note, text on the page, rectangle, ellipse and line, written as real PDF annotations any other reader sees; selecting, editing, deleting and a list of them all, each step undoable. Arabic in a FreeText comment is refused, because the standard PDF fonts cannot shape it
 - **Interactive forms** – Read, fill and save AcroForm fields; create a text field, a tick box or a list of choices; delete a field; flatten the form. An Arabic value is stored exactly as typed, and flattening redraws it with a font that shapes it
 - **Compression** – Removes what the file does not need and recompresses images, reporting the size before and after; if nothing was saved it says so and never writes a larger file
+- **Visible stamp** – An image or a typed name drawn on the page as page content, with its proportions kept and the white background of a scanned signature optionally dropped; a typed Arabic name is shaped and stays searchable. It is **not a digital signature** and the interface says so: it proves nothing about who placed it and detects no later change
 - **Finished conversion** – Export resolution (72–600 DPI), real Markdown with headings and tables, numbered image files for a page range, automatic recognition for a scanned page with the output marked as recognised, plus Print and Document properties
 
 ## Screenshots

@@ -35,7 +35,8 @@ from src.ui.components import (
     ModernButton, ModernIconButton, Card, RibbonGroup,
     EmptyState, PropertiesPanel, ThumbnailPanel, ThumbnailItem
 )
-from src.ui.pdf_viewer import PDFViewer, MODE_REDACT, MODE_COMMENT, MODE_FIELD
+from src.ui.pdf_viewer import (PDFViewer, MODE_REDACT, MODE_COMMENT,
+                               MODE_FIELD, MODE_STAMP)
 from src.ui.ribbon import Ribbon
 
 logger = logging.getLogger("NextPDF")
@@ -264,7 +265,14 @@ class MainWindow(QMainWindow):
                 ("Redact text", self._redact_text, "redact", True),
                 ("Hide an area", self._mark_redaction_area, "redact_area", True),
                 ("Apply the hidden areas", self._apply_marked_redactions,
-                 "redact_apply", True)])])
+                 "redact_apply", True)]),
+            ("Visible stamp", [
+                ("Stamp an image", lambda: self._stamp_mode("image"),
+                 "stamp_image", True),
+                ("Stamp a name", lambda: self._stamp_mode("text"),
+                 "stamp_text", True),
+                ("What a stamp is not", self._explain_stamp,
+                 "stamp_about", False)])])
         ribbon.add_page("view", "View", groups=[
             ("Zoom", [
                 ("Zoom In", self._zoom_in, "view_zoom_in", True),
@@ -472,6 +480,9 @@ class MainWindow(QMainWindow):
         viewer.field_drawn.connect(
             lambda kind, page, rect, c=context:
             self._commit_field(c, kind, page, rect))
+        viewer.stamp_drawn.connect(
+            lambda kind, page, rect, c=context:
+            self._commit_stamp(c, kind, page, rect))
 
         tab_index = self.tab_widget.addTab(viewer, os.path.basename(file_path))
         self.tab_widget.setCurrentIndex(tab_index)
@@ -922,6 +933,70 @@ class MainWindow(QMainWindow):
         context.viewer.refresh_current_page()
         self._update_thumbnails()
         self._update_window_title()
+
+    # --------------------------------------------------------------- stamps
+    STAMP_NOT_A_SIGNATURE = (
+        "A visible stamp is a picture or text placed on the page. It is not a "
+        "digital signature: it does not prove who placed it and it cannot "
+        "detect a later change to the file. Digital signing is not available "
+        "yet.")
+
+    def _explain_stamp(self):
+        """Say plainly what the stamp does and does not prove."""
+        tr = get_translator().tr
+        QMessageBox.information(self, tr("Visible stamp"),
+                                tr(self.STAMP_NOT_A_SIGNATURE))
+
+    def _stamp_mode(self, kind):
+        """Arm the viewer to draw the area for the next stamp of *kind*."""
+        tr = get_translator().tr
+        viewer = getattr(self.current_context, "viewer", None)
+        if viewer is None:
+            return
+        already = (viewer.current_mode() == MODE_STAMP
+                   and viewer.stamp_kind == kind)
+        viewer.set_stamp_mode(None if already else kind)
+        self.status_label.setText(
+            "" if already else tr("Drag where the stamp belongs"))
+
+    def _commit_stamp(self, context, kind, page, rect):
+        """Place the stamp the user drew the area for."""
+        from PySide6.QtWidgets import QInputDialog
+
+        tr = get_translator().tr
+        document = context.document
+        if kind == "image":
+            path, _ = QFileDialog.getOpenFileName(
+                self, tr("Choose the stamp image"), "",
+                tr("Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"))
+            if not path:
+                return
+            drop_white = QMessageBox.question(
+                self, tr("Visible stamp"),
+                tr("Make the white background of the image transparent?")
+            ) == QMessageBox.Yes
+            description = "Stamp an image"
+            action = lambda: document.add_image_stamp(
+                page, rect, path, drop_white_background=drop_white)
+        else:
+            text, accepted = QInputDialog.getText(self, tr("Stamp a name"),
+                                                  tr("The text of the stamp"))
+            if not accepted or not text.strip():
+                return
+            description = "Stamp a name"
+            action = lambda: document.add_text_stamp(page, rect, text.strip())
+        command = PDFSnapshotCommand(document, description, action)
+        context.command_stack.push(command)
+        if command.result is None:
+            QMessageBox.warning(self, tr("Visible stamp"),
+                                document.last_error
+                                or tr("The stamp could not be placed"))
+            return
+        context.viewer.set_stamp_mode(None)
+        context.viewer.refresh_current_page()
+        self._update_thumbnails()
+        self._update_window_title()
+        self.status_label.setText(tr("The stamp was placed."))
 
     # ------------------------------------------------------------- comments
     COMMENT_TITLES = {
