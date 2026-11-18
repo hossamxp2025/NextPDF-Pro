@@ -83,9 +83,36 @@ image are refused.
   certificate first.
 - Moving, resizing or rotating a stamp after it is placed, and repeating it
   across every page in one step, are not implemented.
-- Uninstallation has still never been exercised; the application is left
-  installed at 1.6.1.
 - The binaries are not code-signed.
 - No clean-machine test.
 - No GUI walk-through by hand; the stamp is verified headlessly through the
   packaged binary and through the UI tests, which drive the real window.
+
+## 5. Uninstallation, exercised by the user by hand
+
+The user removed the installed 1.6.1 by hand on 2026-11-18 - the first time
+uninstallation has been exercised at all. I did not run it, so what follows is
+what the machine shows afterwards, not a claim about how it was done:
+
+| Observed | State |
+|---|---|
+| `%LOCALAPPDATA%\Programs\NextPDF Pro` | gone, `unins000.exe` and `unins000.dat` with it |
+| Desktop shortcut | gone |
+| Start Menu group | none (there was none to remove) |
+| Settings branch under `HKCU\Software` | none left |
+| **Uninstall entry in `HKCU\...\CurrentVersion\Uninstall`** | **still present**: `NextPDF Pro الإصدار 1.6.1`, `InstallLocation` and `UninstallString` both pointing into the folder that is gone, so the uninstaller it names does not exist |
+
+So the application still appears in the Windows app list as installed 1.6.1,
+and uninstalling it from there cannot work. Which of two things that is has
+not been established:
+
+- if the folder was deleted by hand rather than through `unins000.exe` or the
+  Windows app list, the leftover key is the expected result of that and not a
+  defect in the installer;
+- if the uninstaller itself was run and exited, the key should have been
+  removed with everything else, and the installer script needs looking at.
+
+Resolving it needs one clean run: install 1.6.1 again, then uninstall through
+`unins000.exe /VERYSILENT /LOG=...`, and read the log and the registry
+afterwards. That has not been done, and the orphaned key is still on the
+machine. No registry key was touched here.
