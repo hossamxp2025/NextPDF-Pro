@@ -49,6 +49,19 @@ memory. It grew from 32 checks to 71.
 | Packaged `--smoke-gui` | PASS (window titled `NextPDF Pro 1.6.0`, ribbon, open document, viewer tab/page) | `docs/evidence/smoke-gui-1.6.0.txt` |
 | Packaged `--verify-release` | **71/71 PASS**, `"frozen": true`, executable = the released EXE | `docs/evidence/verify-1.6.0/report.json` |
 | Source `--verify-release` | 71/71 PASS, `"frozen": false` — same checks, run before the build to separate a packaging fault from a code fault | run on the source tree |
+| Installer | Compiled with Inno Setup 6 (10.9 s) | build log |
+| Installation | `/VERYSILENT /CURRENTUSER`, exit 0; upgraded the installed 1.5.0 in place at `%LOCALAPPDATA%\Programs\NextPDF Pro`; `VERSION.txt` reads 1.6.0 / `20261118-1100` and the uninstall entry reads `1.6.0` | `docs/evidence/install-1.6.0.log` |
+| Installed binary integrity | SHA-256 of the installed `NextPDF-Pro.exe` equals the released hash `f70c84b6…450f55eb` | — |
+| Installed `--version` | `NextPDF Pro 1.6.0 (build 20261118-1100)`, exit 0 | `docs/evidence/version-1.6.0-installed.txt` |
+| Installed `--self-test` | PASS, 0 failures | `docs/evidence/selftest-1.6.0-installed.txt` |
+| Installed `--smoke-gui` | PASS; the window came up in Arabic (`NextPDF Pro 1.6.0 - محرر PDF احترافي`) from the saved language setting | `docs/evidence/smoke-gui-1.6.0-installed.txt` |
+| Installed `--verify-release` | **71/71 PASS**, `"frozen": true`, executable = `%LOCALAPPDATA%\Programs\NextPDF Pro\NextPDF-Pro.exe` | `docs/evidence/verify-1.6.0-installed/report.json` |
+
+One observation from the install, not a defect in this release and the same as
+1.5.0: the silent install reused the task choices remembered from the previous
+install, which had no Start Menu folder and a desktop icon. So no Start Menu
+group was created and the desktop shortcut was refreshed to point at the 1.6.0
+binary. A fresh machine with default choices gets the Start Menu group.
 
 What the 39 new packaged checks prove, concretely:
 
@@ -63,11 +76,8 @@ What the 39 new packaged checks prove, concretely:
 
 ## 4. Not done, and not claimed
 
-- **The installer was compiled but not installed.** `NextPDF-Pro-Setup-1.6.0.exe`
-  exists and its hash is recorded; nothing was installed from it, so nothing is
-  claimed about installing or upgrading 1.6.0. The machine is still carrying the
-  1.5.0 installation.
-- Uninstallation has still never been exercised.
+- Uninstallation has still never been exercised; the application is left
+  installed at 1.6.0.
 - The binaries are not code-signed.
 - No clean-machine test.
 - No GUI walk-through of the new tabs by hand: the new features are verified
