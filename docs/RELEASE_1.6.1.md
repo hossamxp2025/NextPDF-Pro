@@ -58,6 +58,15 @@ reopened.
 | Packaged `--verify-release` | **81/81 PASS**, `"frozen": true`, executable = the released EXE | `docs/evidence/verify-1.6.1/report.json` |
 | Source `--verify-release` | 81/81 PASS, `"frozen": false`, run before the build | — |
 | Installer | Compiled with Inno Setup 6 | build log |
+| Installation | `/VERYSILENT /CURRENTUSER`, exit 0; upgraded the installed 1.6.0 in place at `%LOCALAPPDATA%\Programs\NextPDF Pro`; `VERSION.txt` reads 1.6.1 / `20261118-0940` and the uninstall entry reads `1.6.1` | `docs/evidence/install-1.6.1.log` (local; `.log` is git-ignored) |
+| Installed binary integrity | SHA-256 of the installed `NextPDF-Pro.exe` equals the released hash `883eb53a…1c2e79c1` | — |
+| Installed `--version` | `NextPDF Pro 1.6.1 (build 20261118-0940)`, exit 0 | `docs/evidence/version-1.6.1-installed.txt` |
+| Installed `--self-test` | PASS, 0 failures | `docs/evidence/selftest-1.6.1-installed.txt` |
+| Installed `--smoke-gui` | PASS | `docs/evidence/smoke-gui-1.6.1-installed.txt` |
+| Installed `--verify-release` | **81/81 PASS**, `"frozen": true`, executable = `%LOCALAPPDATA%\Programs\NextPDF Pro\NextPDF-Pro.exe` | `docs/evidence/verify-1.6.1-installed/report.json` |
+
+As with 1.5.0 and 1.6.0, the silent install reused the remembered task choices:
+no Start Menu group, and the desktop shortcut refreshed to the 1.6.1 binary.
 
 What the ten new packaged checks prove: the image is placed and its
 proportions are kept (measured 2:1 in a square area); the typed Arabic name is
@@ -69,16 +78,13 @@ image are refused.
 
 ## 4. Not done, and not claimed
 
-- **The 1.6.1 installer was compiled but not installed.** Its hash is
-  recorded; nothing was installed from it, so nothing is claimed about
-  installing or upgrading to 1.6.1. The machine carries the installed 1.6.0,
-  which was verified in its own record.
 - **The digital signature is not implemented.** No PKCS#12, no verification,
   nothing in the interface that claims to sign. It needs a real test
   certificate first.
 - Moving, resizing or rotating a stamp after it is placed, and repeating it
   across every page in one step, are not implemented.
-- Uninstallation has still never been exercised.
+- Uninstallation has still never been exercised; the application is left
+  installed at 1.6.1.
 - The binaries are not code-signed.
 - No clean-machine test.
 - No GUI walk-through by hand; the stamp is verified headlessly through the
