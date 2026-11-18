@@ -50,7 +50,7 @@ memory. It grew from 32 checks to 71.
 | Packaged `--verify-release` | **71/71 PASS**, `"frozen": true`, executable = the released EXE | `docs/evidence/verify-1.6.0/report.json` |
 | Source `--verify-release` | 71/71 PASS, `"frozen": false` — same checks, run before the build to separate a packaging fault from a code fault | run on the source tree |
 | Installer | Compiled with Inno Setup 6 (10.9 s) | build log |
-| Installation | `/VERYSILENT /CURRENTUSER`, exit 0; upgraded the installed 1.5.0 in place at `%LOCALAPPDATA%\Programs\NextPDF Pro`; `VERSION.txt` reads 1.6.0 / `20261118-1100` and the uninstall entry reads `1.6.0` | `docs/evidence/install-1.6.0.log` |
+| Installation | `/VERYSILENT /CURRENTUSER`, exit 0; upgraded the installed 1.5.0 in place at `%LOCALAPPDATA%\Programs\NextPDF Pro`; `VERSION.txt` reads 1.6.0 / `20261118-1100` and the uninstall entry reads `1.6.0` | `docs/evidence/install-1.6.0.log` (local; `.log` is git-ignored, as in 1.5.0) |
 | Installed binary integrity | SHA-256 of the installed `NextPDF-Pro.exe` equals the released hash `f70c84b6…450f55eb` | — |
 | Installed `--version` | `NextPDF Pro 1.6.0 (build 20261118-1100)`, exit 0 | `docs/evidence/version-1.6.0-installed.txt` |
 | Installed `--self-test` | PASS, 0 failures | `docs/evidence/selftest-1.6.0-installed.txt` |
