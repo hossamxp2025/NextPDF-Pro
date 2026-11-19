@@ -1,7 +1,47 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+}
+
+// ---------------------------------------------------------------- upload key
+//
+// Google Play signs the app with a key it holds; what is uploaded is signed
+// with an *upload* key, which only proves the upload came from us. That key
+// still matters: lose it and a new one has to be registered with Play before
+// another update can be uploaded, so it is backed up, and it never enters git.
+//
+// Its details live in android/keystore.properties, which .gitignore excludes.
+// Nothing here has a default password and nothing falls back to a key checked
+// into the repository: without that file the release build is simply left
+// unsigned, which fails loudly at upload time rather than quietly shipping
+// something signed by a key everyone can read.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun keystoreEntry(name: String): String? =
+    keystoreProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+
+val uploadKeystore = keystoreEntry("storeFile")?.let { path ->
+    val asGiven = File(path)
+    if (asGiven.isAbsolute) asGiven else rootProject.file(path)
+}
+val hasUploadKey = uploadKeystore?.isFile == true &&
+    keystoreEntry("storePassword") != null &&
+    keystoreEntry("keyAlias") != null &&
+    keystoreEntry("keyPassword") != null
+
+if (!hasUploadKey) {
+    logger.lifecycle(
+        "NextPDF: no upload key configured, so a release build will be " +
+            "UNSIGNED. See android/README.md to create one."
+    )
 }
 
 android {
@@ -28,6 +68,21 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("upload") {
+                storeFile = uploadKeystore
+                storePassword = keystoreEntry("storePassword")
+                keyAlias = keystoreEntry("keyAlias")
+                keyPassword = keystoreEntry("keyPassword")
+                // Both schemes: v1 for Android 6 and older, which minSdk 24
+                // still includes, v2 for everything after.
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -36,6 +91,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig =
+                if (hasUploadKey) signingConfigs.getByName("upload") else null
         }
     }
 

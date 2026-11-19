@@ -163,6 +163,63 @@ cd android
 
 The debug APK lands in `app/build/outputs/apk/debug/`.
 
+## Signing, and why the upload is an AAB
+
+Google Play signs the published app **with a key Google holds**. What gets
+uploaded is signed with a separate *upload key*, which only proves that an
+upload came from us. The two are easy to confuse and the difference matters:
+
+| | Upload key | App signing key |
+|---|---|---|
+| Who holds it | us | Google Play |
+| What it proves | this upload came from us | this is the app users installed before |
+| If it is lost | Play support registers a new one | the listing cannot be updated, ever |
+| If it leaks | someone can upload a release as us | far worse |
+
+So the upload key is **not** disposable, and it is not catastrophic either. It
+is a credential to look after.
+
+Play takes an **Android App Bundle** (`.aab`), not an APK; Play builds the APKs
+each device downloads from it. So the release artefact here is a bundle.
+
+### Creating the key
+
+```bash
+powershell -ExecutionPolicy Bypass -File ..\scripts\make_upload_key.ps1
+```
+
+The script takes **no password argument** on purpose. `keytool` prompts, and
+whoever runs it is the only one who sees what they type — nothing reaches a
+script, a shell history, a log, or the process list. The script refuses to
+overwrite an existing keystore, since replacing a key Play already knows about
+is the one mistake here that cannot be undone locally.
+
+Then copy `keystore.properties.example` to `keystore.properties` and fill it
+in. That file and `*.jks` are excluded from git, and the key itself is best
+kept **outside the repository** altogether: a `.gitignore` line is one
+careless `git add -f` away from being bypassed.
+
+### Building the bundle
+
+```bash
+cd android
+./gradlew :app:bundleRelease
+```
+
+The bundle lands in `app/build/outputs/bundle/release/`.
+
+**Without a configured key the release build is left unsigned, deliberately.**
+There is no default password anywhere in the build and no fallback key in the
+repository, so an unsigned bundle is rejected at upload — a loud failure,
+rather than quietly shipping something signed by a key anyone with the
+repository could read.
+
+### Not done
+
+Nothing has been uploaded or published, no Play listing exists, and no key has
+been created — the password has to be typed by its owner, so that step is not
+one this toolchain can take on anyone's behalf.
+
 ## Testing
 
 - `app/src/test/` — runs on the JVM. Covers the zoom and render-width arithmetic,

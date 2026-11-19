@@ -87,6 +87,13 @@ android/captures/
 *.apk
 *.aab
 *.keystore
+
+# The upload key and its passwords. The key is the app's identity on Google
+# Play and the passwords unlock it, so neither ever enters the repository.
+# android/keystore.properties.example shows the shape without the secrets.
+*.jks
+android/keystore.properties
+!android/keystore.properties.example
 *.jks
 
 # Environment
