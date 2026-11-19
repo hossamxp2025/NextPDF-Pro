@@ -76,6 +76,13 @@ class SignatureReport:
         return bool(self.intact and self.valid)
 
 
+_PKCS12_REFUSED = (
+    "No signing key could be read from the certificate. The password is "
+    "probably wrong, or the file is not a PKCS#12 certificate with a private "
+    "key in it."
+)
+
+
 def _require_pyhanko():
     try:
         from pyhanko.sign import signers  # noqa: F401
@@ -109,7 +116,10 @@ def describe_certificate(certificate_path: str, password: str) -> dict:
             "or the file may not be a PKCS#12 certificate."
         ) from exc
     if signer is None:
-        raise SigningError("The certificate file holds no usable signing key")
+        # pyHanko logs the underlying error and returns None rather than
+        # raising, so a wrong password arrives here looking like a bad file.
+        # The two cannot be told apart from the outside; say both.
+        raise SigningError(_PKCS12_REFUSED)
 
     certificate = signer.signing_cert
     not_after = getattr(certificate, "not_valid_after", None)
@@ -285,7 +295,7 @@ def _load_signer(certificate_path: str, password: str):
             "or the file may not be a PKCS#12 certificate."
         ) from exc
     if signer is None:
-        raise SigningError("The certificate file holds no usable signing key")
+        raise SigningError(_PKCS12_REFUSED)
     return signer
 
 

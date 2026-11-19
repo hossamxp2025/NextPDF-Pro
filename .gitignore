@@ -25,6 +25,7 @@ pip-delete-this-directory.txt
 # PyInstaller work directories (build/*.py and installer.iss are sources)
 build/NextPDF-Pro/
 build/pyinstaller_build/
+build/pyi/
 build/_probe_create/
 build/__pycache__/
 

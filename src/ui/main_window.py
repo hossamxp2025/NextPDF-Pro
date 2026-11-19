@@ -266,6 +266,12 @@ class MainWindow(QMainWindow):
                 ("Hide an area", self._mark_redaction_area, "redact_area", True),
                 ("Apply the hidden areas", self._apply_marked_redactions,
                  "redact_apply", True)]),
+            ("Digital signature", [
+                ("Sign with a certificate", self._sign_document, "sign", True),
+                ("Check the signatures", self._check_signatures,
+                 "sign_verify", True),
+                ("What a signature proves", self._explain_signature,
+                 "sign_about", False)]),
             ("Visible stamp", [
                 ("Stamp an image", lambda: self._stamp_mode("image"),
                  "stamp_image", True),
@@ -938,14 +944,152 @@ class MainWindow(QMainWindow):
     STAMP_NOT_A_SIGNATURE = (
         "A visible stamp is a picture or text placed on the page. It is not a "
         "digital signature: it does not prove who placed it and it cannot "
-        "detect a later change to the file. Digital signing is not available "
-        "yet.")
+        "detect a later change to the file. For that, use Sign with a "
+        "certificate.")
+
+    SIGNATURE_EXPLAINED = (
+        "A digital signature does two separate things, and they are worth "
+        "keeping apart.\n\n"
+        "First, it lets any reader prove the file has not changed since it was "
+        "signed. That part is arithmetic: it either holds or it does not, and "
+        "nobody's opinion enters into it.\n\n"
+        "Second, it carries a certificate that claims who signed. That claim "
+        "is worth something only to a reader who trusts the certificate. A "
+        "certificate you made yourself proves nothing to anyone else until "
+        "you give it to them by some other means they trust.\n\n"
+        "What this program does not do: it does not add a timestamp from a "
+        "time authority, so the signing time recorded is the one your computer "
+        "reported and is not evidence of when you signed. It does not embed "
+        "revocation data either, so a reader cannot check later whether the "
+        "certificate was withdrawn.")
 
     def _explain_stamp(self):
         """Say plainly what the stamp does and does not prove."""
         tr = get_translator().tr
         QMessageBox.information(self, tr("Visible stamp"),
                                 tr(self.STAMP_NOT_A_SIGNATURE))
+
+    def _explain_signature(self):
+        """Say what a digital signature proves, and what this build omits."""
+        tr = get_translator().tr
+        QMessageBox.information(self, tr("Digital signature"),
+                                tr(self.SIGNATURE_EXPLAINED))
+
+    def _signable_path(self):
+        """The file on disk to sign, or None after telling the user why not.
+
+        Signing works on bytes, so it has to be the saved file. If the open
+        document has unsaved edits, signing the file on disk would sign the
+        old content and quietly claim the new - so it is refused instead.
+        """
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return None
+        if not document.file_path or not os.path.isfile(document.file_path):
+            QMessageBox.information(
+                self, tr("Sign with a certificate"),
+                tr("Save this document to a file first. A signature is made "
+                   "over the bytes of a saved file."))
+            return None
+        if getattr(document, "is_modified", False):
+            QMessageBox.information(
+                self, tr("Sign with a certificate"),
+                tr("This document has unsaved changes. Save them first, "
+                   "otherwise the signature would cover the file as it is on "
+                   "disk, not what you see."))
+            return None
+        return document.file_path
+
+    def _sign_document(self):
+        """Sign the saved document into a new file the user chooses."""
+        from src.engine.signing import Placement, SigningError, sign_document
+        from src.ui.sign_dialog import SignDialog, placement_rect
+
+        tr = get_translator().tr
+        source = self._signable_path()
+        if source is None:
+            return
+        document = self.current_document
+        viewer = getattr(self.current_context, "viewer", None)
+        dialog = SignDialog(self, page_count=max(1, document.page_count),
+                            current_page=getattr(viewer, "current_page", 1) or 1)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        choices = dialog.signing_arguments()
+
+        placement = None
+        if choices["visible"]:
+            page = document.get_page(choices["page"])
+            if page is None:
+                QMessageBox.critical(self, tr("Error"),
+                                     tr("That page does not exist in this document"))
+                return
+            placement = Placement(
+                page=choices["page"] - 1,
+                rect=placement_rect(choices["position"],
+                                    page.rect.width, page.rect.height))
+
+        base, ext = os.path.splitext(source)
+        output, _ = QFileDialog.getSaveFileName(
+            self, tr("Save the signed file as"), f"{base}-signed{ext or '.pdf'}",
+            f"{tr('PDF files')} (*.pdf)")
+        if not output:
+            return
+        try:
+            result = sign_document(
+                source, output,
+                choices["certificate_path"], choices["password"],
+                reason=choices["reason"], location=choices["location"],
+                signer_label=choices["signer_label"], placement=placement)
+        except SigningError as error:
+            QMessageBox.critical(self, tr("Sign with a certificate"), str(error))
+            return
+        except Exception as error:  # pragma: no cover - unexpected library fault
+            logger.exception("Signing failed")
+            QMessageBox.critical(self, tr("Sign with a certificate"),
+                                 f"{tr('The document could not be signed')}: {error}")
+            return
+        self.status_label.setText(
+            f"{tr('The signed copy was written')}: {os.path.basename(result['output'])}")
+        QMessageBox.information(
+            self, tr("Sign with a certificate"),
+            tr("The signed copy is saved. The original is untouched. There is "
+               "no timestamp from a time authority in it, and no revocation "
+               "data, so it is not a long-term archival signature."))
+
+    def _check_signatures(self):
+        """Read back the signatures of the document on disk."""
+        from src.engine.signing import SigningError, verify_document
+        from src.ui.sign_dialog import SignatureReportDialog
+
+        tr = get_translator().tr
+        document = self.current_document
+        if document is None:
+            return
+        path = document.file_path
+        if not path or not os.path.isfile(path):
+            QMessageBox.information(
+                self, tr("Check the signatures"),
+                tr("Save this document to a file first. A signature is made "
+                   "over the bytes of a saved file."))
+            return
+        try:
+            reports = verify_document(path)
+        except SigningError as error:
+            QMessageBox.critical(self, tr("Check the signatures"), str(error))
+            return
+        except Exception as error:  # pragma: no cover - unexpected library fault
+            logger.exception("Signature verification failed")
+            QMessageBox.critical(self, tr("Check the signatures"),
+                                 f"{tr('The signatures could not be read')}: {error}")
+            return
+        if getattr(document, "is_modified", False):
+            QMessageBox.information(
+                self, tr("Check the signatures"),
+                tr("These results describe the file on disk. The unsaved "
+                   "changes in front of you are not part of it."))
+        SignatureReportDialog(reports, self).exec()
 
     def _stamp_mode(self, kind):
         """Arm the viewer to draw the area for the next stamp of *kind*."""

@@ -38,7 +38,9 @@ def document(tmp_path):
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((72, 100), "Signed document test", fontsize=14)
-    doc.save(str(path))
+    # Uncompressed so the tampering test can find a byte to change and point
+    # at it, rather than flipping a byte at a guessed offset.
+    doc.save(str(path), deflate=False)
     doc.close()
     return str(path)
 
@@ -118,10 +120,12 @@ def test_changing_a_byte_of_the_signed_file_is_detected(document, tmp_path):
     tampered = str(tmp_path / "tampered.pdf")
     shutil.copyfile(output, tampered)
 
+    # MuPDF writes the page text as a hex string, so that is what to look for.
+    original = b"Signed".hex().encode("ascii")
     data = bytearray(open(tampered, "rb").read())
-    marker = data.find(b"Signed document test")
-    assert marker != -1, "the test needs the visible text to still be findable"
-    data[marker:marker + 6] = b"Forged"
+    marker = data.find(original)
+    assert marker != -1, "the test needs the page text to still be findable"
+    data[marker:marker + len(original)] = b"Forged".hex().encode("ascii")
     open(tampered, "wb").write(bytes(data))
 
     report = verify_document(tampered, trust_roots=[ROOT])[0]

@@ -11,6 +11,12 @@ fonttools>=4.50.0
 # OCR runs on the Tesseract linked into MuPDF; only the language data in
 # resources/tessdata is shipped. No tesseract.exe and no OpenCV are needed.
 
+# Digital signing (PKCS#12 signing and verification inside PDFs).
+# pyHanko pulls asn1crypto, cryptography, pyhanko-certvalidator, lxml,
+# aiohttp and tzlocal with it; they are not listed separately on purpose,
+# so pip resolves the versions pyHanko itself asks for.
+pyHanko>=0.38.0
+
 # Export dependencies:
 Pillow>=10.0.0
 python-docx>=1.1.0

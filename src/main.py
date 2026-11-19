@@ -76,6 +76,48 @@ def setup_fonts(app):
     app.setFont(font)
 
 
+def _write_throwaway_certificate(path: str, password: str) -> None:
+    """A self-signed PKCS#12 that exists for one self-test run and nothing else.
+
+    Its password is a constant on purpose: the certificate is created in a
+    temporary folder, used once and deleted, and guards nothing.
+    """
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "NextPDF Self Test")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), True)
+        .add_extension(
+            x509.KeyUsage(digital_signature=True, content_commitment=True,
+                          key_encipherment=False, data_encipherment=False,
+                          key_agreement=False, key_cert_sign=False,
+                          crl_sign=False, encipher_only=False,
+                          decipher_only=False), True)
+        .sign(key, hashes.SHA256())
+    )
+    blob = pkcs12.serialize_key_and_certificates(
+        name=b"nextpdf-selftest", key=key, cert=certificate, cas=None,
+        encryption_algorithm=serialization.BestAvailableEncryption(
+            password.encode("utf-8")))
+    with open(path, "wb") as handle:
+        handle.write(blob)
+
+
 def _run_self_test() -> int:
     """Headless end-to-end check used to validate a packaged build.
 
@@ -139,6 +181,34 @@ def _run_self_test() -> int:
             pix = page.get_pixmap(dpi=72, clip=fitz.Rect(150, 295, 300, 330))
             check("Arabic ink saved", any(b < 200 for b in pix.samples))
             check("reopen readable", "Self test original" in text)
+
+        # Signing is the one feature whose libraries are reached by name, so
+        # a packaged build can ship without them and only fail when a user
+        # tries to sign.  A throwaway certificate is made here and used for
+        # real, because importing the module would not prove it works.
+        try:
+            from src.engine.signing import sign_document, verify_document
+
+            certificate = os.path.join(workdir, "selftest.p12")
+            _write_throwaway_certificate(certificate, "selftest")
+            signed = os.path.join(workdir, "selftest_signed.pdf")
+            sign_document(output, signed, certificate, "selftest",
+                          reason="Self test")
+            # The throwaway certificate is self-signed, so pyHanko logs the
+            # failed trust path as an error with a traceback.  That outcome is
+            # expected here and is not what this check is about; left as it is
+            # it reads like a crash in a passing self-test.
+            quiet = logging.getLogger("pyhanko")
+            previous = quiet.level
+            quiet.setLevel(logging.CRITICAL)
+            try:
+                reports = verify_document(signed)
+            finally:
+                quiet.setLevel(previous)
+            check("signing works", bool(reports) and reports[0].intact,
+                  "" if reports else "no signature read back")
+        except Exception as exc:
+            check("signing works", False, repr(exc))
     except Exception as exc:  # pragma: no cover - reported as failure
         check("self test exception", False, repr(exc))
     finally:

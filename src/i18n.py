@@ -56,8 +56,8 @@ TRANSLATIONS = {
         "Stamp an image": "ختم بصورة",
         "Stamp a name": "ختم باسم",
         "What a stamp is not": "ما لا يفعله الختم",
-        "A visible stamp is a picture or text placed on the page. It is not a digital signature: it does not prove who placed it and it cannot detect a later change to the file. Digital signing is not available yet.":
-            "الختم المرئي صورة أو نص يوضع على الصفحة. وهو ليس توقيعًا رقميًا: لا يثبت من وضعه، ولا يكشف تغييرًا يحدث للملف بعده. التوقيع الرقمي غير متاح بعد.",
+        "A visible stamp is a picture or text placed on the page. It is not a digital signature: it does not prove who placed it and it cannot detect a later change to the file. For that, use Sign with a certificate.":
+            "الختم المرئي صورة أو نص يوضع على الصفحة. وهو ليس توقيعًا رقميًا: لا يثبت من وضعه، ولا يكشف تغييرًا يحدث للملف بعده. ولهذا الغرض استخدم «التوقيع بشهادة».",
         "Drag where the stamp belongs": "اسحب في المكان الذي تريد الختم فيه",
         "Stamp mode: drag where the stamp belongs":
             "وضع الختم: اسحب في المكان الذي تريد الختم فيه",
@@ -443,6 +443,71 @@ TRANSLATIONS = {
         "Unsupported conversion options": "خيارات التحويل غير مدعومة",
         "Invalid page selection": "اختيار صفحات غير صالح",
         "This output format requires one selected page": "هذه الصيغة تتطلب صفحة واحدة محددة",
+        # Digital signature
+        "Digital signature": "التوقيع الرقمي",
+        "Sign with a certificate": "التوقيع بشهادة",
+        "Check the signatures": "التحقق من التوقيعات",
+        "What a signature proves": "ما يثبته التوقيع",
+        "A digital signature is added to a new copy of the file; this document is left as it is. The signature lets a reader prove the file has not changed since it was signed. Whether the reader also believes it was you depends on their trusting your certificate.":
+            "يُضاف التوقيع الرقمي إلى نسخة جديدة من الملف، وهذا المستند يبقى كما هو. والتوقيع يتيح لأي قارئ أن يثبت أن الملف لم يتغير منذ توقيعه. أما أن يقتنع القارئ بأنك أنت من وقّع فذلك يعتمد على ثقته في شهادتك.",
+        "Certificate": "الشهادة",
+        "Browse": "استعراض",
+        "Certificate file (.p12 or .pfx)": "ملف الشهادة (.p12 أو .pfx)",
+        "Certificate password": "كلمة مرور الشهادة",
+        "Check the certificate": "فحص الشهادة",
+        "What the signature records": "ما يسجّله التوقيع",
+        "Name to show": "الاسم المعروض",
+        "Reason": "السبب",
+        "Place": "المكان",
+        "Draw the signature on the page": "ارسم التوقيع على الصفحة",
+        "An invisible signature is not a weaker one. It is simply not drawn.":
+            "التوقيع غير المرئي ليس أضعف، إنما هو فقط غير مرسوم.",
+        "Sign": "توقيع",
+        "Choose a certificate": "اختر شهادة",
+        "Certificate files": "ملفات الشهادات",
+        "Choose a certificate file first.": "اختر ملف الشهادة أولًا.",
+        "Signer": "الموقِّع",
+        "Issued by": "جهة الإصدار",
+        "Valid until": "صالحة حتى",
+        "This certificate has expired.": "هذه الشهادة منتهية الصلاحية.",
+        "This certificate signed itself, so no authority vouches for it. A signature made with it still proves the file has not changed, but a reader has no way to confirm who made it unless you give them this certificate yourself.":
+            "هذه الشهادة وقّعت نفسها، فلا توجد جهة تشهد لها. والتوقيع بها يثبت أن الملف لم يتغير، لكن القارئ لا يملك وسيلة للتأكد من هوية من وقّع إلا إذا أعطيته هذه الشهادة بنفسك.",
+        "Choose the certificate to sign with.": "اختر الشهادة التي ستوقّع بها.",
+        "That certificate file does not exist.": "ملف الشهادة هذا غير موجود.",
+        "Bottom right": "أسفل اليمين",
+        "Bottom left": "أسفل اليسار",
+        "Top right": "أعلى اليمين",
+        "Top left": "أعلى اليسار",
+        "This document has no digital signature.": "هذا المستند لا يحمل توقيعًا رقميًا.",
+        "Signature": "توقيع",
+        "not stated": "غير مذكور",
+        "Signed at": "وقت التوقيع",
+        "the time the signer claims, not a verified one":
+            "الوقت الذي يذكره الموقِّع، وليس وقتًا موثَّقًا",
+        "The file has not changed since it was signed.": "الملف لم يتغير منذ توقيعه.",
+        "The file HAS changed since it was signed.": "الملف تغيّر بعد توقيعه.",
+        "Something was added to the file after signing; the signature does not cover that part.":
+            "أُضيف شيء إلى الملف بعد التوقيع، والتوقيع لا يشمل هذا الجزء.",
+        "The certificate is trusted on this computer.": "الشهادة موثوقة على هذا الجهاز.",
+        "The signer is not confirmed: no authority this computer trusts vouches for the certificate.":
+            "هوية الموقِّع غير مؤكَّدة: لا توجد جهة يثق بها هذا الجهاز تشهد للشهادة.",
+        "Reason given": "السبب المذكور",
+        "Place given": "المكان المذكور",
+        "A digital signature does two separate things, and they are worth keeping apart.\n\nFirst, it lets any reader prove the file has not changed since it was signed. That part is arithmetic: it either holds or it does not, and nobody's opinion enters into it.\n\nSecond, it carries a certificate that claims who signed. That claim is worth something only to a reader who trusts the certificate. A certificate you made yourself proves nothing to anyone else until you give it to them by some other means they trust.\n\nWhat this program does not do: it does not add a timestamp from a time authority, so the signing time recorded is the one your computer reported and is not evidence of when you signed. It does not embed revocation data either, so a reader cannot check later whether the certificate was withdrawn.":
+            "التوقيع الرقمي يفعل أمرين منفصلين، ويستحقان أن يُفرَّق بينهما.\n\nالأول: يتيح لأي قارئ أن يثبت أن الملف لم يتغير منذ توقيعه. وهذا الجزء حساب رياضي: إما يصح وإما لا، ولا يدخل فيه رأي أحد.\n\nالثاني: يحمل شهادة تدّعي من الذي وقّع. وهذا الادعاء لا قيمة له إلا عند قارئ يثق في الشهادة. والشهادة التي تصنعها بنفسك لا تثبت شيئًا لأحد غيرك حتى تسلّمها له بوسيلة أخرى يثق بها.\n\nوما لا يفعله هذا البرنامج: لا يضيف ختمًا زمنيًا من سلطة توقيت، فوقت التوقيع المسجَّل هو ما أبلغ به جهازك وليس دليلًا على وقت توقيعك. ولا يضمّن بيانات سحب الشهادة، فلا يستطيع القارئ أن يتحقق لاحقًا مما إذا كانت الشهادة قد سُحبت.",
+        "Save this document to a file first. A signature is made over the bytes of a saved file.":
+            "احفظ هذا المستند في ملف أولًا. التوقيع يُحسب على بايتات ملف محفوظ.",
+        "This document has unsaved changes. Save them first, otherwise the signature would cover the file as it is on disk, not what you see.":
+            "هذا المستند فيه تعديلات غير محفوظة. احفظها أولًا، وإلا سيغطي التوقيع الملف كما هو على القرص لا كما تراه أمامك.",
+        "That page does not exist in this document": "هذه الصفحة غير موجودة في المستند",
+        "Save the signed file as": "حفظ الملف الموقَّع باسم",
+        "The document could not be signed": "لم يتمكن البرنامج من توقيع المستند",
+        "The signed copy was written": "تمت كتابة النسخة الموقَّعة",
+        "The signed copy is saved. The original is untouched. There is no timestamp from a time authority in it, and no revocation data, so it is not a long-term archival signature.":
+            "تم حفظ النسخة الموقَّعة، والأصل لم يُمَس. ولا يوجد فيها ختم زمني من سلطة توقيت ولا بيانات سحب، فهي ليست توقيعًا أرشيفيًا طويل الأمد.",
+        "The signatures could not be read": "لم يتمكن البرنامج من قراءة التوقيعات",
+        "These results describe the file on disk. The unsaved changes in front of you are not part of it.":
+            "هذه النتائج تصف الملف الموجود على القرص. والتعديلات غير المحفوظة التي أمامك ليست جزءًا منه.",
     },
     "en": {},
 }

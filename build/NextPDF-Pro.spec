@@ -34,6 +34,14 @@ datas = [
 pymupdf_modules = [m for m in collect_submodules("pymupdf")
                    if not m.startswith("pymupdf.layout")]
 
+# pyHanko reaches its signing back-ends and its CMS attribute classes by name,
+# so the static analysis does not see them.  Collected wholesale rather than
+# listed, because a missing one would only show up as a failure at signing
+# time inside the packaged EXE, where it is hardest to diagnose.
+signing_modules = (collect_submodules("pyhanko")
+                   + collect_submodules("pyhanko_certvalidator")
+                   + collect_submodules("asn1crypto"))
+
 a = Analysis(
     [os.path.join(PROJECT_ROOT, "src", "main.py")],
     pathex=[PROJECT_ROOT],
@@ -54,7 +62,10 @@ a = Analysis(
         "fontTools",
         "fontTools.ttLib",
         "fontTools.subset",
-    ] + pymupdf_modules + collect_submodules("fontTools"),
+        "cryptography",
+        "cryptography.hazmat.primitives.serialization.pkcs12",
+        "tzlocal",
+    ] + pymupdf_modules + signing_modules + collect_submodules("fontTools"),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
