@@ -1,6 +1,6 @@
 # NextPDF Pro for Android
 
-**Version 0.2.0 — it now changes documents, and it is still not the Windows build.**
+**Version 0.2.1 — it now changes documents, and it is still not the Windows build.**
 
 This is a separate application, not a port. The Windows build is Python with PyQt6
 and PyMuPDF; neither runs on Android. What the two share is the **engine** —
@@ -8,7 +8,7 @@ MuPDF 1.28, the same family — and the project's rules about saying only what h
 been tested. Why it had to be a new application, and what is expected to carry
 over, is in [`../docs/ANDROID_PLAN.md`](../docs/ANDROID_PLAN.md).
 
-The version number is 0.2.0 and not 1.6.1 on purpose. It is still well short of
+The version number is 0.2.1 and not 1.6.1 on purpose. It is still well short of
 the Windows build's feature set, and a matching number would imply otherwise.
 
 ## What it does
@@ -27,6 +27,12 @@ Reading:
 - Reports format, page count, encryption and reader permissions.
 - Arabic and English, with the layout and the navigation arrows mirroring from the
   system.
+
+The page, zoom and tool controls sit in a row **under the title bar**, not at the
+foot of the screen. On a phone with on-screen navigation buttons the foot of the
+screen belongs to the system, and controls placed there cannot be pressed. The
+navigation bar itself is hidden while the app is open and comes back for as long
+as it is needed when swiped up from the bottom edge.
 
 Changing (new in 0.2.0):
 
@@ -50,20 +56,39 @@ stamping, no redaction, no Office conversion, no OCR, no digital signing. The
 Windows build does those; this one does not, and the "About" screen says so in
 both languages rather than leaving it to be discovered.
 
+## What 0.2.1 fixed
+
+0.2.0 was run on a real phone. Three things were wrong and are fixed here:
+
+- **The icon was not the program's icon.** It is now, and the artwork itself was
+  repaired: the "PDF" and "Pro" lettering in `NextPDF-Pro.svg` was drawn as
+  solid shapes whose paths were malformed, so both words rendered as unreadable
+  blobs on Windows as well. They are drawn as strokes now, and every desktop
+  size and the `.ico` were regenerated from the corrected drawing.
+- **The controls could not be pressed**, because the bar holding them sat on top
+  of the phone's navigation buttons. They moved under the title bar.
+- **The page counter read backwards in Arabic** — "1 / 7" came out as "7 / 1",
+  because a slash between two numbers is a neutral character and takes the
+  paragraph's direction. The counter is wrapped in a left-to-right isolate.
+
 ## Verified, and not verified
 
 Built on 2026-11-19 with JDK 17.0.21, Android SDK platform 35, Gradle 8.11.1:
 
 | Check | Result |
 |---|---|
-| `:app:assembleDebug` | **passed** — `app-debug.apk`, 43.71 MB |
-| `:app:assembleRelease` (R8 + resource shrinking + lintVital) | **passed** — 29.75 MB unsigned |
+| `:app:assembleDebug` | **passed** — `app-debug.apk`, 43.67 MB |
+| `:app:assembleRelease` (R8 + resource shrinking + lintVital) | **passed** — 29.75 MB unsigned at 0.2.0 |
 | `:app:testDebugUnitTest` | **23 tests, 0 failures** (zoom arithmetic, save options, permission bits) |
-| Manifest in the built APK | `com.futureautomation.nextpdf`, versionName `0.2.0`, versionCode 2, minSdk 24, targetSdk 35 |
+| Manifest in the built APK | `com.futureautomation.nextpdf`, versionName `0.2.1`, versionCode 3, minSdk 24, targetSdk 35 |
 | Launcher icon in the built APK | legacy, round and adaptive-foreground PNGs at all five densities |
 
-**Not verified: that any of it runs.** There is still no Android device or
-emulator attached to the machine this was built on, so nothing below has been
+0.2.0 was installed and opened on a phone and drew its pages correctly, which is
+the first time any of this was seen running. That is the whole of what has been
+seen.
+
+**Not verified: that the rest of it runs.** There is still no Android device or
+emulator attached to the machine this is built on, so nothing below has been
 executed even once:
 
 - the new tools — rotate, delete, compress, protect, unprotect, export, share,

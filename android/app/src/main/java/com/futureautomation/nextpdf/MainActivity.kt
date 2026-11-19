@@ -21,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,6 +111,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.futureautomation.nextpdf.print.PdfPrintAdapter
 import com.futureautomation.nextpdf.ui.NextPdfTheme
@@ -129,6 +133,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        hideNavigationBar()
         setContent {
             NextPdfTheme {
                 val model: ViewerViewModel = viewModel()
@@ -141,6 +146,26 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // The system puts its bars back after a dialog, a share sheet or a
+        // moment in the recents list; put them away again.
+        if (hasFocus) hideNavigationBar()
+    }
+
+    /**
+     * Hides the navigation buttons so they cannot sit under the app's own
+     * controls, and lets a swipe from the edge bring them back for as long as
+     * the user needs them. The status bar stays: the clock and the battery are
+     * not in anyone's way, and hiding them only makes the phone feel broken.
+     */
+    private fun hideNavigationBar() {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.navigationBars())
     }
 
     private fun openFrom(intent: Intent, model: ViewerViewModel) {
@@ -294,26 +319,27 @@ private fun ViewerScreen(model: ViewerViewModel) {
                         }
                     },
                 )
+                if (ready != null) {
+                    // The controls live up here, not at the foot of the screen:
+                    // down there they sit on top of the phone's own navigation
+                    // buttons and cannot be pressed.
+                    ControlBar(
+                        pageNumber = currentPage + 1,
+                        pageCount = ready.pageCount,
+                        zoom = zoom,
+                        onPrevious = { model.requestScrollTo((currentPage - 1).coerceAtLeast(0)) },
+                        onNext = {
+                            model.requestScrollTo((currentPage + 1).coerceAtMost(ready.pageCount - 1))
+                        },
+                        onPageTap = { showGoToPage = true },
+                        onZoomIn = { model.stepZoom(1.25f) },
+                        onZoomOut = { model.stepZoom(0.8f) },
+                        onFitWidth = { model.setZoom(1f) },
+                        onTools = { showTools = true },
+                    )
+                }
                 if (searchOpen && ready != null) SearchBar(model)
                 if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-        },
-        bottomBar = {
-            if (ready != null) {
-                BottomBar(
-                    pageNumber = currentPage + 1,
-                    pageCount = ready.pageCount,
-                    zoom = zoom,
-                    onPrevious = { model.requestScrollTo((currentPage - 1).coerceAtLeast(0)) },
-                    onNext = {
-                        model.requestScrollTo((currentPage + 1).coerceAtMost(ready.pageCount - 1))
-                    },
-                    onPageTap = { showGoToPage = true },
-                    onZoomIn = { model.stepZoom(1.25f) },
-                    onZoomOut = { model.stepZoom(0.8f) },
-                    onFitWidth = { model.setZoom(1f) },
-                    onTools = { showTools = true },
-                )
             }
         },
     ) { padding ->
@@ -518,8 +544,15 @@ private fun SearchBar(model: ViewerViewModel) {
     }
 }
 
+/**
+ * Page, zoom and tools, in a row directly under the title bar.
+ *
+ * It was at the foot of the screen in 0.2.0 and that was wrong: on a phone with
+ * on-screen navigation buttons the two rows overlap and the app's buttons cannot
+ * be reached at all.
+ */
 @Composable
-private fun BottomBar(
+private fun ControlBar(
     pageNumber: Int,
     pageCount: Int,
     zoom: Float,
@@ -535,6 +568,9 @@ private fun BottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // A narrow phone can run out of room for ten controls; scrolling
+                // the row keeps every one of them reachable.
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -542,7 +578,10 @@ private fun BottomBar(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.page_previous))
             }
             Text(
-                text = stringResource(R.string.page_short, pageNumber, pageCount),
+                // Isolated left-to-right: "1 / 7" in an Arabic layout otherwise
+                // comes out as "7 / 1", because the slash is a neutral character
+                // between two numbers and takes the paragraph's direction.
+                text = "⁦" + stringResource(R.string.page_short, pageNumber, pageCount) + "⁩",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier
                     .clickable(onClick = onPageTap)
@@ -558,7 +597,7 @@ private fun BottomBar(
                 Icon(Icons.Filled.Remove, stringResource(R.string.zoom_out))
             }
             Text(
-                text = stringResource(R.string.zoom_level, zoomPercent(zoom)),
+                text = "⁦" + stringResource(R.string.zoom_level, zoomPercent(zoom)) + "⁩",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier
                     .clickable(onClick = onFitWidth)

@@ -14,8 +14,8 @@ android {
         targetSdk = 35
         // Deliberately 0.1.0 and not 1.6.1: this app shares the desktop engine and
         // the desktop rules, not its feature set. See docs/ANDROID_PLAN.md.
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
