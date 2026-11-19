@@ -1,14 +1,21 @@
 package com.futureautomation.nextpdf.viewer
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.futureautomation.nextpdf.pdf.DocumentInfo
+import com.futureautomation.nextpdf.pdf.PasswordRule
 import com.futureautomation.nextpdf.pdf.PdfFile
+import com.futureautomation.nextpdf.pdf.Permissions
+import com.futureautomation.nextpdf.pdf.SaveOptions
 import com.futureautomation.nextpdf.pdf.SearchHit
+import com.futureautomation.nextpdf.pdf.checkPassword
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,12 +23,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** How many wrong passwords are allowed before the document is given up on. */
 const val PASSWORD_ATTEMPTS = 3
 
 /** Files larger than this are refused with a reason rather than risking an OOM kill. */
 const val MAX_FILE_BYTES = 64L * 1024L * 1024L
+
+/** The width a page is drawn at when it is exported as an image. */
+const val EXPORT_IMAGE_WIDTH_PX = 2000
 
 sealed interface ViewerState {
     data object Empty : ViewerState
@@ -38,6 +49,38 @@ enum class Failure {
     WRONG_PASSWORD_TOO_OFTEN,
     NO_PAGES,
     CANNOT_READ_FILE,
+}
+
+/** What a save is meant to produce. The file on disk is never changed in place. */
+enum class SaveKind {
+    COPY,
+    COMPRESSED,
+    PROTECTED,
+    UNPROTECTED,
+    PAGE_IMAGE,
+}
+
+/** Why a task did not finish. Like [Failure], every value names a real cause. */
+enum class TaskFailure {
+    NOT_A_PDF,
+    SAVE_FAILED,
+    EXPORT_FAILED,
+    LAST_PAGE,
+    NO_TEXT,
+    NOT_ENCRYPTED,
+    PASSWORD_EMPTY,
+    PASSWORD_HAS_COMMA,
+    PASSWORD_TOO_LONG,
+}
+
+/** The one-off message shown after a task, as data rather than a pre-built string. */
+sealed interface Notice {
+    data class Saved(val name: String, val bytes: Long, val wasBytes: Long?) : Notice
+    data class ImageSaved(val name: String) : Notice
+    data class TextCopied(val characters: Int) : Notice
+    data class PageDeleted(val pageNumber: Int) : Notice
+    data class Rotated(val degrees: Int) : Notice
+    data class Problem(val reason: TaskFailure) : Notice
 }
 
 class ViewerViewModel(application: Application) : AndroidViewModel(application) {
@@ -61,24 +104,56 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     private val _scrollTo = MutableStateFlow<Int?>(null)
     val scrollTo: StateFlow<Int?> = _scrollTo.asStateFlow()
 
+    /** The page the user is looking at, 0-based, reported by the list as it scrolls. */
+    private val _currentPage = MutableStateFlow(0)
+    val currentPage: StateFlow<Int> = _currentPage.asStateFlow()
+
+    /**
+     * Bumped after every edit. Page bitmaps are keyed on it, so a rotated or
+     * deleted page is redrawn instead of being served from the last composition.
+     */
+    private val _revision = MutableStateFlow(0)
+    val revision: StateFlow<Int> = _revision.asStateFlow()
+
+    /** True while a task is running; the interface shows a bar and blocks a second one. */
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    /** True when something has been changed and not written to any file yet. */
+    private val _edited = MutableStateFlow(false)
+    val edited: StateFlow<Boolean> = _edited.asStateFlow()
+
+    /** Draw pages inverted, for reading in the dark. Affects the screen only. */
+    private val _nightReading = MutableStateFlow(false)
+    val nightReading: StateFlow<Boolean> = _nightReading.asStateFlow()
+
+    private val _notice = MutableStateFlow<Notice?>(null)
+    val notice: StateFlow<Notice?> = _notice.asStateFlow()
+
     private var file: PdfFile? = null
     private var attemptsLeft = PASSWORD_ATTEMPTS
     private var pendingName: String = ""
+    private var sourceBytes: Long = 0L
     private var searchJob: Job? = null
 
-    fun setZoom(value: Float) {
-        _zoom.value = clampZoom(value)
-    }
+    /** The save the user asked for, held while the system asks them where to put it. */
+    private var pendingKind: SaveKind? = null
+    private var pendingPassword: String = ""
+    private var pendingPermissions: Permissions = Permissions()
+    private var pendingPageIndex: Int = 0
 
-    fun stepZoom(factor: Float) {
-        _zoom.value = steppedZoom(_zoom.value, factor)
-    }
+    // -----------------------------------------------------------------
+    // Opening
+    // -----------------------------------------------------------------
 
     fun open(uri: Uri) {
         viewModelScope.launch {
             closeCurrent()
             _state.value = ViewerState.Opening
             _zoom.value = MIN_ZOOM
+            _currentPage.value = 0
+            _edited.value = false
+            _notice.value = null
             clearSearch()
 
             val name = displayName(uri)
@@ -93,6 +168,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                 _state.value = ViewerState.Failed(Failure.CANNOT_READ_FILE)
                 return@launch
             }
+            sourceBytes = bytes.size.toLong()
 
             val opened = try {
                 PdfFile.open(bytes, name.ifBlank { "document.pdf" })
@@ -171,11 +247,25 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    // -----------------------------------------------------------------
+    // Drawing
+    // -----------------------------------------------------------------
+
     suspend fun renderPage(index: Int, widthPx: Int): Bitmap? {
         val opened = file ?: return null
         if (widthPx <= 0) return null
         return try {
             opened.renderPage(index, widthPx)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    suspend fun renderThumbnail(index: Int, widthPx: Int, heightPx: Int): Bitmap? {
+        val opened = file ?: return null
+        if (widthPx <= 0 || heightPx <= 0) return null
+        return try {
+            opened.renderPageFit(index, widthPx, heightPx)
         } catch (_: Throwable) {
             null
         }
@@ -189,6 +279,26 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             1f / 1.414f
         }
     }
+
+    fun setZoom(value: Float) {
+        _zoom.value = clampZoom(value)
+    }
+
+    fun stepZoom(factor: Float) {
+        _zoom.value = steppedZoom(_zoom.value, factor)
+    }
+
+    fun toggleNightReading() {
+        _nightReading.value = !_nightReading.value
+    }
+
+    fun setCurrentPage(index: Int) {
+        _currentPage.value = index
+    }
+
+    // -----------------------------------------------------------------
+    // Searching
+    // -----------------------------------------------------------------
 
     fun setSearchQuery(value: String) {
         _searchQuery.value = value
@@ -245,8 +355,236 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         _scrollTo.value = null
     }
 
+    // -----------------------------------------------------------------
+    // Editing the document in memory
+    // -----------------------------------------------------------------
+
+    /** Turns the page on screen. The file on disk is untouched until it is saved. */
+    fun rotateCurrentPage(byDegrees: Int) = runTask {
+        val opened = file ?: return@runTask
+        val index = _currentPage.value
+        try {
+            opened.rotatePage(index, byDegrees)
+        } catch (_: PdfFile.NotAPdf) {
+            _notice.value = Notice.Problem(TaskFailure.NOT_A_PDF)
+            return@runTask
+        }
+        _edited.value = true
+        _revision.value += 1
+        _notice.value = Notice.Rotated(byDegrees)
+    }
+
+    /** Removes the page on screen, unless it is the only one left. */
+    fun deleteCurrentPage() = runTask {
+        val opened = file ?: return@runTask
+        val ready = _state.value as? ViewerState.Ready ?: return@runTask
+        if (ready.pageCount <= 1) {
+            _notice.value = Notice.Problem(TaskFailure.LAST_PAGE)
+            return@runTask
+        }
+        val index = _currentPage.value.coerceIn(0, ready.pageCount - 1)
+        try {
+            opened.deletePage(index)
+        } catch (_: PdfFile.NotAPdf) {
+            _notice.value = Notice.Problem(TaskFailure.NOT_A_PDF)
+            return@runTask
+        }
+        val remaining = try {
+            opened.pageCount()
+        } catch (_: Throwable) {
+            ready.pageCount - 1
+        }
+        _state.value = ready.copy(pageCount = remaining)
+        _currentPage.value = index.coerceAtMost(remaining - 1)
+        _edited.value = true
+        _revision.value += 1
+        clearSearch()
+        _notice.value = Notice.PageDeleted(index + 1)
+    }
+
+    /** Puts the page's text on the clipboard, as text rather than as a picture. */
+    fun copyCurrentPageText() = runTask {
+        val opened = file ?: return@runTask
+        val text = try {
+            opened.pageText(_currentPage.value)
+        } catch (_: Throwable) {
+            ""
+        }
+        if (text.isBlank()) {
+            _notice.value = Notice.Problem(TaskFailure.NO_TEXT)
+            return@runTask
+        }
+        val clipboard = getApplication<Application>()
+            .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(pendingName, text))
+        _notice.value = Notice.TextCopied(text.length)
+    }
+
+    // -----------------------------------------------------------------
+    // Saving. The system picks the destination, so this is in two halves.
+    // -----------------------------------------------------------------
+
+    /**
+     * Records what the user asked for and returns the file name to suggest, or
+     * null when the request cannot be met and a notice has been raised instead.
+     */
+    fun prepareSave(kind: SaveKind, password: String = ""): String? {
+        val ready = _state.value as? ViewerState.Ready ?: return null
+        if (kind == SaveKind.PROTECTED) {
+            when (checkPassword(password)) {
+                PasswordRule.EMPTY -> {
+                    _notice.value = Notice.Problem(TaskFailure.PASSWORD_EMPTY); return null
+                }
+                PasswordRule.HAS_COMMA -> {
+                    _notice.value = Notice.Problem(TaskFailure.PASSWORD_HAS_COMMA); return null
+                }
+                PasswordRule.TOO_LONG -> {
+                    _notice.value = Notice.Problem(TaskFailure.PASSWORD_TOO_LONG); return null
+                }
+                PasswordRule.OK -> Unit
+            }
+        }
+        if (kind == SaveKind.UNPROTECTED && !ready.info.isEncrypted) {
+            _notice.value = Notice.Problem(TaskFailure.NOT_ENCRYPTED)
+            return null
+        }
+        pendingKind = kind
+        pendingPassword = password
+        pendingPageIndex = _currentPage.value
+        return suggestedName(ready.name, kind)
+    }
+
+    /** Carries out the save the user prepared, into the destination they picked. */
+    fun completeSave(destination: Uri) = runTask {
+        val kind = pendingKind ?: return@runTask
+        pendingKind = null
+        val opened = file ?: return@runTask
+
+        if (kind == SaveKind.PAGE_IMAGE) {
+            val bitmap = renderPage(pendingPageIndex, EXPORT_IMAGE_WIDTH_PX)
+            if (bitmap == null) {
+                _notice.value = Notice.Problem(TaskFailure.EXPORT_FAILED)
+                return@runTask
+            }
+            val written = withContext(Dispatchers.IO) {
+                runCatching {
+                    getApplication<Application>().contentResolver
+                        .openOutputStream(destination)?.use { out ->
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        } ?: false
+                }.getOrDefault(false)
+            }
+            bitmap.recycle()
+            _notice.value = if (written) {
+                Notice.ImageSaved(displayName(destination))
+            } else {
+                Notice.Problem(TaskFailure.EXPORT_FAILED)
+            }
+            return@runTask
+        }
+
+        val options = when (kind) {
+            SaveKind.COPY -> SaveOptions.plainCopy()
+            SaveKind.COMPRESSED -> SaveOptions.compressed()
+            SaveKind.PROTECTED -> SaveOptions.protected(pendingPassword, pendingPermissions)
+            SaveKind.UNPROTECTED -> SaveOptions.unprotected()
+            SaveKind.PAGE_IMAGE -> return@runTask
+        }
+        pendingPassword = ""
+
+        // MuPDF writes to a path, so the file is built in the cache and then
+        // handed to the location the user chose.
+        val scratch = File(getApplication<Application>().cacheDir, "save-${System.nanoTime()}.pdf")
+        val size = try {
+            opened.saveTo(scratch.absolutePath, options)
+            val bytes = scratch.length()
+            val copied = withContext(Dispatchers.IO) {
+                runCatching {
+                    getApplication<Application>().contentResolver
+                        .openOutputStream(destination)?.use { out ->
+                            scratch.inputStream().use { it.copyTo(out) }
+                            true
+                        } ?: false
+                }.getOrDefault(false)
+            }
+            if (!copied) null else bytes
+        } catch (_: PdfFile.NotAPdf) {
+            _notice.value = Notice.Problem(TaskFailure.NOT_A_PDF)
+            return@runTask
+        } catch (_: Throwable) {
+            null
+        } finally {
+            scratch.delete()
+        }
+
+        if (size == null) {
+            _notice.value = Notice.Problem(TaskFailure.SAVE_FAILED)
+            return@runTask
+        }
+        _edited.value = false
+        _notice.value = Notice.Saved(
+            name = displayName(destination),
+            bytes = size,
+            wasBytes = if (kind == SaveKind.COMPRESSED) sourceBytes else null,
+        )
+    }
+
+    /**
+     * Writes the document, as it now stands, into the cache and returns the file,
+     * for handing to another app or to the printer. Returns null if it cannot.
+     */
+    suspend fun exportToCache(): File? {
+        val opened = file ?: return null
+        val folder = File(getApplication<Application>().cacheDir, "shared")
+        withContext(Dispatchers.IO) { folder.mkdirs() }
+        val safeName = pendingName.ifBlank { "document.pdf" }
+            .replace(Regex("[^\\p{L}\\p{N}._-]"), "_")
+            .let { if (it.endsWith(".pdf", ignoreCase = true)) it else "$it.pdf" }
+        val target = File(folder, safeName)
+        return try {
+            withContext(Dispatchers.IO) { target.delete() }
+            opened.saveTo(target.absolutePath, SaveOptions.plainCopy())
+            target
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun dismissNotice() {
+        _notice.value = null
+    }
+
     fun dismissFailure() {
         _state.value = ViewerState.Empty
+    }
+
+    fun raiseProblem(reason: TaskFailure) {
+        _notice.value = Notice.Problem(reason)
+    }
+
+    // -----------------------------------------------------------------
+
+    private fun runTask(block: suspend () -> Unit) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                block()
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    private fun suggestedName(original: String, kind: SaveKind): String {
+        val stem = original.substringBeforeLast('.', original).ifBlank { "document" }
+        return when (kind) {
+            SaveKind.COPY -> "$stem-copy.pdf"
+            SaveKind.COMPRESSED -> "$stem-compressed.pdf"
+            SaveKind.PROTECTED -> "$stem-protected.pdf"
+            SaveKind.UNPROTECTED -> "$stem-unlocked.pdf"
+            SaveKind.PAGE_IMAGE -> "$stem-page${_currentPage.value + 1}.png"
+        }
     }
 
     private suspend fun closeCurrent() {

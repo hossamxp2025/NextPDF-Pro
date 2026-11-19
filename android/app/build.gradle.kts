@@ -14,8 +14,8 @@ android {
         targetSdk = 35
         // Deliberately 0.1.0 and not 1.6.1: this app shares the desktop engine and
         // the desktop rules, not its feature set. See docs/ANDROID_PLAN.md.
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
 
     implementation(libs.mupdf.fitz)
 

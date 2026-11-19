@@ -11,13 +11,19 @@
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_reset">Fit width</string>
+    <string name="more_actions">More</string>
+    <string name="done">Done</string>
+    <string name="save">Save</string>
 
     <string name="welcome_title">No document open</string>
     <string name="welcome_body">Pick a PDF to read it. The file is opened from where you chose it; nothing is copied anywhere and nothing is sent over the network.</string>
 
     <string name="opening">Opening…</string>
+    <string name="working">Working…</string>
     <string name="page_of">Page %1$d of %2$d</string>
+    <string name="page_short">%1$d / %2$d</string>
     <string name="zoom_level">%1$d%%</string>
+    <string name="unsaved_changes">Changed — not saved yet</string>
 
     <string name="password_title">This document is protected</string>
     <string name="password_body">It needs its open password. %1$d attempts left.</string>
@@ -47,8 +53,64 @@
     <string name="info_permission_edit">editing</string>
     <string name="info_permission_annotate">commenting</string>
 
+    <!-- Pages -->
+    <string name="pages_title">Pages</string>
+    <string name="page_previous">Previous page</string>
+    <string name="page_next">Next page</string>
+    <string name="go_to_page">Go to page</string>
+    <string name="go_to_page_hint">Page number</string>
+    <string name="night_reading">Night reading</string>
+    <string name="night_reading_on">Night reading is on</string>
+
+    <!-- Tools -->
+    <string name="tools_title">Tools</string>
+    <string name="tool_rotate_left">Rotate left</string>
+    <string name="tool_rotate_right">Rotate right</string>
+    <string name="tool_delete_page">Delete this page</string>
+    <string name="tool_page_image">Save page as image</string>
+    <string name="tool_copy_text">Copy page text</string>
+    <string name="tool_protect">Protect with a password</string>
+    <string name="tool_unprotect">Remove the password</string>
+    <string name="tool_compress">Compress and save</string>
+    <string name="tool_save_copy">Save a copy</string>
+    <string name="tool_share">Share</string>
+    <string name="tool_print">Print</string>
+    <string name="tools_edit_note">Changes are made to the copy in memory. Nothing touches your original file until you save, and saving always writes a new file.</string>
+
+    <!-- Protect dialog -->
+    <string name="protect_title">Protect with a password</string>
+    <string name="protect_body">The file is written again with AES-256 encryption. The same password both opens the file and permits changing it.</string>
+    <string name="protect_allow">Allow the reader to:</string>
+    <string name="protect_warning">If you lose this password the file cannot be opened. Nothing here can recover it.</string>
+
+    <!-- Unprotect -->
+    <string name="unprotect_title">Remove the password</string>
+    <string name="unprotect_body">A new file is written with no encryption at all. Anyone who gets it can open it.</string>
+
+    <!-- Notices -->
+    <string name="notice_saved">Saved as %1$s (%2$s)</string>
+    <string name="notice_saved_smaller">Saved as %1$s — %2$s instead of %3$s</string>
+    <string name="notice_saved_bigger">Saved as %1$s — %2$s, which is not smaller than the original %3$s</string>
+    <string name="notice_image_saved">Page saved as %1$s</string>
+    <string name="notice_text_copied">%1$d characters copied</string>
+    <string name="notice_page_deleted">Page %1$d removed. Save to keep this.</string>
+    <string name="notice_rotated">Page turned. Save to keep this.</string>
+    <string name="problem_not_a_pdf">This document is not a PDF, so it cannot be changed.</string>
+    <string name="problem_save_failed">The file could not be written to the place you chose.</string>
+    <string name="problem_export_failed">The page could not be saved as an image.</string>
+    <string name="problem_last_page">This is the only page left, so it cannot be removed.</string>
+    <string name="problem_no_text">This page has no text to copy. It may be a scan, and this version does not run OCR.</string>
+    <string name="problem_not_encrypted">This document has no password to remove.</string>
+    <string name="problem_password_empty">Type a password first.</string>
+    <string name="problem_password_comma">The password cannot contain a comma. The engine reads its settings as a comma-separated list, so a comma would cut the password in half and write a file nobody could open.</string>
+    <string name="problem_password_long">The password is longer than 32 characters.</string>
+    <string name="problem_share_failed">A copy for sharing could not be prepared.</string>
+    <string name="problem_no_app">No app on this phone can take that.</string>
+
     <string name="about_version">Version %1$s</string>
     <string name="about_body">NextPDF Pro for Android, built on the same MuPDF engine as the Windows build, under the GNU AGPL v3.</string>
+    <string name="about_does_title">What this version does</string>
+    <string name="about_does">Reads and searches PDFs, including password-protected ones. Turns and removes pages, saves a copy, compresses, adds or removes AES-256 password protection, saves a page as an image, copies a page\'s text, shares and prints.</string>
     <string name="about_not_yet_title">What this version does NOT do</string>
-    <string name="about_not_yet">This is version 0.1.0 and it is a reader. It does not edit text, does not add comments, does not fill forms, does not stamp, does not encrypt or redact, does not convert to Office formats and does not run OCR. The Windows build does those; this one does not, and nothing here pretends otherwise.\n\nThere is no digital signing, and no visible stamp either — and a visible stamp would not be a digital signature in any case.</string>
+    <string name="about_not_yet">It does not edit the text inside a page, does not add comments or highlights, does not fill forms, does not stamp, does not redact, does not convert to Office formats and does not run OCR. The Windows build does those; this one does not, and nothing here pretends otherwise.\n\nThere is no digital signing, and no visible stamp either — and a visible stamp would not be a digital signature in any case.</string>
 </resources>

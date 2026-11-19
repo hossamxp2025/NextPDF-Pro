@@ -21,6 +21,9 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+# The full icon set. R8 keeps only the icons that are referenced, so the release
+# build does not carry the thousands this library defines.
+androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 mupdf-fitz = { group = "com.artifex.mupdf", name = "fitz", version.ref = "mupdf" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }

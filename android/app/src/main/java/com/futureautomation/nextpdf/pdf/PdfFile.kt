@@ -17,6 +17,8 @@ package com.futureautomation.nextpdf.pdf
 
 import android.graphics.Bitmap
 import com.artifex.mupdf.fitz.Document
+import com.artifex.mupdf.fitz.PDFDocument
+import com.artifex.mupdf.fitz.PDFPage
 import com.artifex.mupdf.fitz.Quad
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import kotlinx.coroutines.CoroutineDispatcher
@@ -149,6 +151,91 @@ class PdfFile private constructor(
             mayAnnotate = document.hasPermission(Document.PERMISSION_ANNOTATE),
         )
     }
+
+    // ---------------------------------------------------------------------
+    // Changing the document. Everything below needs a PDF; a document in any
+    // other format throws [NotAPdf] rather than quietly doing nothing.
+    // ---------------------------------------------------------------------
+
+    /** Thrown when an edit is asked of a document that is not a PDF. */
+    class NotAPdf : RuntimeException("this document is not a PDF, so it cannot be edited")
+
+    private fun pdf(): PDFDocument = document.asPDF() ?: throw NotAPdf()
+
+    /**
+     * The page's stored /Rotate value, normalised to 0, 90, 180 or 270.
+     *
+     * A page that inherits its rotation from the page tree rather than carrying
+     * its own reports 0 here. That is rare, and the cost is only that the first
+     * turn of such a page starts counting from zero.
+     */
+    suspend fun pageRotation(index: Int): Int = withContext(dispatcher) {
+        val page = pdf().loadPage(index) as PDFPage
+        try {
+            val stored = page.`object`.get("Rotate")
+            val degrees = if (stored != null && stored.isInteger) stored.asInteger() else 0
+            ((degrees % 360) + 360) % 360
+        } finally {
+            page.destroy()
+        }
+    }
+
+    /** Turns one page by [byDegrees] (a multiple of 90) and leaves it unsaved. */
+    suspend fun rotatePage(index: Int, byDegrees: Int) = withContext(dispatcher) {
+        val page = pdf().loadPage(index) as PDFPage
+        try {
+            val stored = page.`object`.get("Rotate")
+            val current = if (stored != null && stored.isInteger) stored.asInteger() else 0
+            val turned = (((current + byDegrees) % 360) + 360) % 360
+            page.`object`.put("Rotate", turned)
+        } finally {
+            page.destroy()
+        }
+    }
+
+    /** Removes one page. The caller is responsible for not removing the last one. */
+    suspend fun deletePage(index: Int) = withContext(dispatcher) {
+        pdf().deletePage(index)
+    }
+
+    /**
+     * Rebuilds the document from [order], a list of the pages to keep in the order
+     * to keep them. Pages left out are dropped, and a page may appear twice.
+     */
+    suspend fun rearrangePages(order: IntArray) = withContext(dispatcher) {
+        require(order.isNotEmpty()) { "a document cannot be left with no pages" }
+        pdf().rearrangePages(order)
+    }
+
+    /** True when an edit has been made that is not yet in any saved file. */
+    suspend fun hasUnsavedChanges(): Boolean = withContext(dispatcher) {
+        try {
+            pdf().hasUnsavedChanges()
+        } catch (_: NotAPdf) {
+            false
+        }
+    }
+
+    /**
+     * Writes the whole document to [path] with MuPDF's own writer options, which
+     * [SaveOptions] builds. This writes a new file; the document in memory and the
+     * file it came from are untouched.
+     */
+    suspend fun saveTo(path: String, options: String) = withContext(dispatcher) {
+        pdf().save(path, options)
+    }
+
+    /** Draws a page to fit inside a box, for thumbnails. */
+    suspend fun renderPageFit(index: Int, widthPx: Int, heightPx: Int): Bitmap =
+        withContext(dispatcher) {
+            require(widthPx > 0 && heightPx > 0) { "thumbnail box must have a size" }
+            val page = document.loadPage(index)
+            try {
+                AndroidDrawDevice.drawPageFit(page, widthPx, heightPx)
+            } finally {
+                page.destroy()
+            }
+        }
 
     /** Releases the native document and the thread that owned it. Safe to call twice. */
     suspend fun close() {

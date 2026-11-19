@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The one folder another app may read from, and only while a share is open. It
+  holds a copy the app wrote itself; the user's own files are never exposed here.
+-->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

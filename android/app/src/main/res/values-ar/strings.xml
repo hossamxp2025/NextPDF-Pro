@@ -7,34 +7,40 @@
     <string name="about">حول</string>
     <string name="close">إغلاق</string>
     <string name="cancel">إلغاء</string>
-    <string name="unlock">فتح الحماية</string>
+    <string name="unlock">فتح القفل</string>
     <string name="zoom_in">تكبير</string>
     <string name="zoom_out">تصغير</string>
     <string name="zoom_reset">ملء العرض</string>
+    <string name="more_actions">المزيد</string>
+    <string name="done">تم</string>
+    <string name="save">حفظ</string>
 
     <string name="welcome_title">لا يوجد مستند مفتوح</string>
-    <string name="welcome_body">اختر ملف PDF لقراءته. الملف يُفتح من مكانه، ولا يُنسخ إلى أي مكان، ولا يُرسل عبر الشبكة.</string>
+    <string name="welcome_body">اختر ملف PDF لقراءته. يُفتح الملف من مكانه، ولا يُنسخ إلى أي مكان، ولا يُرسل عبر الشبكة.</string>
 
     <string name="opening">جارٍ الفتح…</string>
+    <string name="working">جارٍ التنفيذ…</string>
     <string name="page_of">صفحة %1$d من %2$d</string>
+    <string name="page_short">%1$d / %2$d</string>
     <string name="zoom_level">%1$d%%</string>
+    <string name="unsaved_changes">تغييرات غير محفوظة</string>
 
     <string name="password_title">هذا المستند محمي</string>
-    <string name="password_body">يحتاج كلمة مرور الفتح. باقي %1$d محاولات.</string>
+    <string name="password_body">يحتاج كلمة مرور الفتح. بقيت %1$d محاولات.</string>
     <string name="password_wrong">كلمة المرور غير مقبولة.</string>
     <string name="password_hint">كلمة المرور</string>
 
     <string name="search_hint">النص المطلوب</string>
     <string name="search_running">جارٍ البحث…</string>
     <string name="search_matches">%1$d نتيجة</string>
-    <string name="search_none">لا توجد نتائج</string>
-    <string name="search_jump">النتيجة %1$d</string>
+    <string name="search_none">لا نتائج</string>
+    <string name="search_jump">نتيجة %1$d</string>
 
-    <string name="failed_unreadable">لم يُقرأ الملف كمستند. قد يكون تالفًا، أو ليس ملف PDF.</string>
-    <string name="failed_too_large">حجم الملف أكبر من 64 ميجابايت. هذا الإصدار يقرأ الملف كاملًا في الذاكرة، فيرفض ملفًا بهذا الحجم بدلًا من أن يُقتل في منتصف القراءة.</string>
-    <string name="failed_wrong_password">ثلاث كلمات مرور خاطئة. المستند يبقى مغلقًا.</string>
-    <string name="failed_no_pages">المستند فُتح لكنه لا يُبلّغ عن أي صفحة.</string>
-    <string name="failed_cannot_read">لم يُقرأ الملف من مكان تخزينه.</string>
+    <string name="failed_unreadable">تعذّرت قراءة الملف كمستند. قد يكون تالفًا أو ليس PDF.</string>
+    <string name="failed_too_large">حجم الملف أكبر من 64 ميجابايت. هذا الإصدار يقرأ الملف كله في الذاكرة، فيرفض ملفًا بهذا الحجم بدل أن يُقتل في منتصف القراءة.</string>
+    <string name="failed_wrong_password">ثلاث محاولات خاطئة. المستند يبقى مغلقًا.</string>
+    <string name="failed_no_pages">فُتح المستند لكنه يبلّغ أنه بلا صفحات.</string>
+    <string name="failed_cannot_read">تعذّرت قراءة الملف من مكان تخزينه.</string>
 
     <string name="info_title">المستند</string>
     <string name="info_format">الصيغة</string>
@@ -47,8 +53,64 @@
     <string name="info_permission_edit">التعديل</string>
     <string name="info_permission_annotate">التعليق</string>
 
+    <!-- الصفحات -->
+    <string name="pages_title">الصفحات</string>
+    <string name="page_previous">الصفحة السابقة</string>
+    <string name="page_next">الصفحة التالية</string>
+    <string name="go_to_page">الانتقال إلى صفحة</string>
+    <string name="go_to_page_hint">رقم الصفحة</string>
+    <string name="night_reading">القراءة الليلية</string>
+    <string name="night_reading_on">القراءة الليلية مفعّلة</string>
+
+    <!-- الأدوات -->
+    <string name="tools_title">الأدوات</string>
+    <string name="tool_rotate_left">تدوير لليسار</string>
+    <string name="tool_rotate_right">تدوير لليمين</string>
+    <string name="tool_delete_page">حذف هذه الصفحة</string>
+    <string name="tool_page_image">حفظ الصفحة كصورة</string>
+    <string name="tool_copy_text">نسخ نص الصفحة</string>
+    <string name="tool_protect">الحماية بكلمة مرور</string>
+    <string name="tool_unprotect">إزالة كلمة المرور</string>
+    <string name="tool_compress">ضغط وحفظ</string>
+    <string name="tool_save_copy">حفظ نسخة</string>
+    <string name="tool_share">مشاركة</string>
+    <string name="tool_print">طباعة</string>
+    <string name="tools_edit_note">التعديلات تجري على النسخة الموجودة في الذاكرة. ملفك الأصلي لا يُمَس حتى تحفظ، والحفظ يكتب ملفًا جديدًا دائمًا.</string>
+
+    <!-- حوار الحماية -->
+    <string name="protect_title">الحماية بكلمة مرور</string>
+    <string name="protect_body">يُكتب الملف من جديد بتشفير AES-256. نفس كلمة المرور تفتح الملف وتسمح بتعديله.</string>
+    <string name="protect_allow">اسمح للقارئ بـ:</string>
+    <string name="protect_warning">لو ضاعت كلمة المرور فلن يُفتح الملف. لا شيء هنا يستطيع استرجاعها.</string>
+
+    <!-- إزالة الحماية -->
+    <string name="unprotect_title">إزالة كلمة المرور</string>
+    <string name="unprotect_body">يُكتب ملف جديد بلا أي تشفير. من يحصل عليه يفتحه.</string>
+
+    <!-- الإشعارات -->
+    <string name="notice_saved">حُفظ باسم %1$s (%2$s)</string>
+    <string name="notice_saved_smaller">حُفظ باسم %1$s — %2$s بدل %3$s</string>
+    <string name="notice_saved_bigger">حُفظ باسم %1$s — %2$s، وهو ليس أصغر من الأصل %3$s</string>
+    <string name="notice_image_saved">حُفظت الصفحة باسم %1$s</string>
+    <string name="notice_text_copied">نُسخ %1$d حرفًا</string>
+    <string name="notice_page_deleted">حُذفت الصفحة %1$d. احفظ لتثبيت ذلك.</string>
+    <string name="notice_rotated">دارت الصفحة. احفظ لتثبيت ذلك.</string>
+    <string name="problem_not_a_pdf">هذا المستند ليس PDF، فلا يمكن تعديله.</string>
+    <string name="problem_save_failed">تعذّرت كتابة الملف في المكان الذي اخترته.</string>
+    <string name="problem_export_failed">تعذّر حفظ الصفحة كصورة.</string>
+    <string name="problem_last_page">هذه آخر صفحة متبقية، فلا يمكن حذفها.</string>
+    <string name="problem_no_text">لا نص في هذه الصفحة لنسخه. قد تكون صورة ممسوحة، وهذا الإصدار لا يشغّل OCR.</string>
+    <string name="problem_not_encrypted">لا كلمة مرور على هذا المستند لإزالتها.</string>
+    <string name="problem_password_empty">اكتب كلمة المرور أولًا.</string>
+    <string name="problem_password_comma">لا يمكن أن تحتوي كلمة المرور على فاصلة. المحرك يقرأ إعداداته كقائمة مفصولة بفواصل، فالفاصلة تقطع كلمة المرور نصفين وتكتب ملفًا لا يفتحه أحد.</string>
+    <string name="problem_password_long">كلمة المرور أطول من 32 حرفًا.</string>
+    <string name="problem_share_failed">تعذّر تجهيز نسخة للمشاركة.</string>
+    <string name="problem_no_app">لا تطبيق على هذا الهاتف يستقبل ذلك.</string>
+
     <string name="about_version">الإصدار %1$s</string>
     <string name="about_body">NextPDF Pro لأندرويد، مبني على نفس محرك MuPDF المستخدم في نسخة ويندوز، تحت رخصة GNU AGPL v3.</string>
+    <string name="about_does_title">ما يفعله هذا الإصدار</string>
+    <string name="about_does">يقرأ ملفات PDF ويبحث داخلها، بما فيها المحمية بكلمة مرور. يدوّر الصفحات ويحذفها، ويحفظ نسخة، ويضغط، ويضيف أو يزيل حماية AES-256، ويحفظ الصفحة كصورة، وينسخ نص الصفحة، ويشارك ويطبع.</string>
     <string name="about_not_yet_title">ما لا يفعله هذا الإصدار</string>
-    <string name="about_not_yet">هذا الإصدار 0.1.0 وهو قارئ فقط. لا يحرّر النص، ولا يضيف تعليقات، ولا يعبّئ النماذج، ولا يختم، ولا يشفّر ولا يُخفي، ولا يحوّل إلى صيغ أوفيس، ولا يشغّل التعرف الضوئي. نسخة ويندوز تفعل ذلك، وهذه لا تفعله، ولا شيء هنا يدّعي غير ذلك.\n\nولا يوجد توقيع رقمي، ولا ختم مرئي كذلك — والختم المرئي ليس توقيعًا رقميًا على أي حال.</string>
+    <string name="about_not_yet">لا يحرّر النص داخل الصفحة، ولا يضيف تعليقات أو تظليلًا، ولا يملأ النماذج، ولا يختم، ولا يُخفي (redaction)، ولا يحوّل إلى صيغ أوفيس، ولا يشغّل OCR. نسخة ويندوز تفعل ذلك، وهذه لا تفعله، ولا شيء هنا يدّعي العكس.\n\nلا يوجد توقيع رقمي، ولا ختم مرئي كذلك — والختم المرئي ليس توقيعًا رقميًا على أي حال.</string>
 </resources>
