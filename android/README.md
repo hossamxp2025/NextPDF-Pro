@@ -79,6 +79,9 @@ Built on 2026-11-19 with JDK 17.0.21, Android SDK platform 35, Gradle 8.11.1:
 |---|---|
 | `:app:assembleDebug` | **passed** — `app-debug.apk`, 43.67 MB |
 | `:app:assembleRelease` (R8 + resource shrinking + lintVital) | **passed** — 29.75 MB unsigned at 0.2.0 |
+| `:app:bundleRelease` with the upload key | **passed** — `app-release.aab`, 18.24 MB |
+| `jarsigner -verify` on that bundle | **`jar verified.`** — signer `CN=Hossam Mouhamed, …, C=EG` |
+| Signer certificate's SHA-256, taken out of the bundle | **matches the keystore's**, byte for byte |
 | `:app:testDebugUnitTest` | **23 tests, 0 failures** (zoom arithmetic, save options, permission bits) |
 | Manifest in the built APK | `com.futureautomation.nextpdf`, versionName `0.2.1`, versionCode 3, minSdk 24, targetSdk 35 |
 | Launcher icon in the built APK | legacy, round and adaptive-foreground PNGs at all five densities |
@@ -233,11 +236,17 @@ repository, so an unsigned bundle is rejected at upload — a loud failure,
 rather than quietly shipping something signed by a key anyone with the
 repository could read.
 
+`jarsigner` warns four times about a bundle signed this way, and all four are
+**expected for an upload key**: the certificate is self-signed (that is what an
+upload key is), so no chain can be built to a certificate authority; there is
+no trusted timestamp; and the `JarInputStream` notice comes from the order
+`bundletool` writes the archive in, not from a defect in it.
+
 ### Not done
 
-Nothing has been uploaded or published, no Play listing exists, and no key has
-been created — the password has to be typed by its owner, so that step is not
-one this toolchain can take on anyone's behalf.
+Nothing has been uploaded or published and no Play listing exists. The key's
+password is typed by its owner and is not known to this toolchain, which is
+also why the keystore's key size cannot be read back out of the file here.
 
 ## Testing
 
