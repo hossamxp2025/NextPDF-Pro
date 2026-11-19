@@ -26,13 +26,30 @@
     The key's name inside the keystore. Must match keyAlias in
     keystore.properties.
 
+.PARAMETER DistinguishedName
+    Who the certificate says it belongs to, as one X.500 string, for example
+    "CN=Your Name, O=Your Organisation, L=Your City, C=EG". None of it is
+    secret and nobody verifies it, so it is given on the command line: that
+    way keytool asks only for the passwords, and a slip while answering six
+    questions in a row cannot end up inside the certificate. Leave it out and
+    keytool asks for the fields itself, as it did before.
+
+    The country has to be a two-letter ISO code. X.509 defines that field as
+    exactly two characters, and keytool does NOT check it - it will happily
+    write a city name or a whole sentence there. This script checks instead,
+    because the cheap moment to catch it is before the key exists.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\make_upload_key.ps1
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\make_upload_key.ps1 -DistinguishedName "CN=A Name, O=An Organisation, L=A City, C=EG"
 #>
 [CmdletBinding()]
 param(
     [string]$KeystorePath = (Join-Path $HOME "keys\nextpdf-upload.jks"),
-    [string]$Alias = "nextpdf-upload"
+    [string]$Alias = "nextpdf-upload",
+    [string]$DistinguishedName
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,6 +82,27 @@ function Find-Keytool {
 $keytool = Find-Keytool
 Write-Host "keytool: $keytool"
 
+# keytool accepts anything in the country field, so check it here. A
+# certificate whose countryName breaks the two-character rule is malformed
+# per X.509, and whether Play's backend minds is not something to find out
+# after the key is registered.
+$dnameArguments = @()
+if ($DistinguishedName) {
+    $country = [regex]::Match($DistinguishedName, '(?i)(?:^|,)\s*C\s*=\s*([^,]*)')
+    if (-not $country.Success) {
+        throw ("The distinguished name has no country field. Add one, as a " +
+               "two-letter ISO code, for example C=EG.")
+    }
+    $code = $country.Groups[1].Value.Trim().Trim('"')
+    if ($code -notmatch '^[A-Za-z]{2}$') {
+        throw ("The country in the distinguished name is '$code'. It has to " +
+               "be a two-letter ISO code, such as EG, SA or US - X.509 " +
+               "allows exactly two characters there, and keytool will not " +
+               "stop you putting something else in.")
+    }
+    $dnameArguments = @("-dname", $DistinguishedName)
+}
+
 # Never overwrite. A keystore that is already registered with Play and gets
 # replaced by a fresh one is the one mistake here that cannot be undone from
 # this machine.
@@ -84,8 +122,18 @@ Write-Host ""
 Write-Host "keytool will now ask for:"
 Write-Host "  - a keystore password, twice. Choose a long one and keep it in"
 Write-Host "    your password manager. Nobody can recover it for you."
-Write-Host "  - your name and organisation. These end up inside the"
-Write-Host "    certificate; they are not secret and not checked by anyone."
+Write-Host "    It must be ASCII - plain letters, digits and punctuation."
+Write-Host "    keytool refuses anything else with 'Password is not ASCII',"
+Write-Host "    so Arabic or any other script will not work here. A long"
+Write-Host "    passphrase in Latin letters is stronger anyway."
+if (-not $DistinguishedName) {
+    Write-Host "  - your name and organisation. These end up inside the"
+    Write-Host "    certificate; they are not secret and not checked by"
+    Write-Host "    anyone. The country must be a two-letter code (EG, SA,"
+    Write-Host "    US); keytool does not check, so getting it wrong there"
+    Write-Host "    goes unnoticed. Answer 'no' at the confirmation line to"
+    Write-Host "    be asked all of them again."
+}
 Write-Host "  - a key password. Pressing Enter reuses the keystore password,"
 Write-Host "    which is what keystore.properties expects unless you set"
 Write-Host "    keyPassword to something else."
@@ -96,7 +144,8 @@ Write-Host ""
     -alias $Alias `
     -keyalg $KeyAlgorithm `
     -keysize $KeySize `
-    -validity $ValidityDays
+    -validity $ValidityDays `
+    @dnameArguments
 
 if ($LASTEXITCODE -ne 0) {
     throw "keytool failed with exit code $LASTEXITCODE. No key was created."

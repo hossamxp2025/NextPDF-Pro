@@ -185,7 +185,7 @@ each device downloads from it. So the release artefact here is a bundle.
 ### Creating the key
 
 ```bash
-powershell -ExecutionPolicy Bypass -File ..\scripts\make_upload_key.ps1
+powershell -ExecutionPolicy Bypass -File ..\scripts\make_upload_key.ps1 -DistinguishedName "CN=Your Name, O=Your Organisation, L=Your City, C=EG"
 ```
 
 The script takes **no password argument** on purpose. `keytool` prompts, and
@@ -193,6 +193,25 @@ whoever runs it is the only one who sees what they type — nothing reaches a
 script, a shell history, a log, or the process list. The script refuses to
 overwrite an existing keystore, since replacing a key Play already knows about
 is the one mistake here that cannot be undone locally.
+
+`-DistinguishedName` is who the certificate says it belongs to. None of it is
+secret and nobody verifies it, which is why it goes on the command line:
+`keytool` then asks only for the passwords, instead of six questions in a row
+that end up inside a certificate if one is answered wrongly. Leave the flag
+out and `keytool` asks for the fields itself.
+
+Two things that bite, both found the hard way:
+
+- **The country must be a two-letter ISO code.** X.509 defines that field as
+  exactly two characters and `keytool` does **not** check it — it will write a
+  city name, or a whole pasted sentence, without complaint. The script checks
+  instead, and refuses before the key exists. Whether Play's backend minds a
+  malformed country is untested here; the point is not to find out after the
+  key is registered.
+- **The password must be ASCII.** `keytool` fails with `Password is not ASCII`
+  on Arabic or any other script. It fails cleanly — no keystore is written —
+  but it fails after the passwords have been typed twice. A long passphrase in
+  Latin letters is stronger than a short mixed one anyway.
 
 Then copy `keystore.properties.example` to `keystore.properties` and fill it
 in. That file and `*.jks` are excluded from git, and the key itself is best
