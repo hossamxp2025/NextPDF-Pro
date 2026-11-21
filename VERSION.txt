@@ -1,5 +1,5 @@
 NextPDF Pro
-Version: 1.6.1
-Build: 20261118-0940
-Status: feature release (visible stamp: an image or a typed name on the page; not a digital signature)
+Version: 1.6.2
+Build: 20261121-1119
+Status: feature release (digital signing with a PKCS#12 certificate, visible or invisible; no trusted timestamp and no revocation data, so not PAdES B-LT/LTA)
 Platform: Windows x64
