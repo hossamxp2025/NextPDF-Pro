@@ -1,0 +1,13 @@
+[PASS] bundled fonts present - ['DejaVuSans-Bold.ttf', 'DejaVuSans-BoldOblique.ttf', 'DejaVuSans-Oblique.ttf', 'DejaVuSans.ttf', 'NotoNaskhArabic-Regular.ttf', 'NotoSans-Regular.ttf', 'NotoSansArabic-Bold.ttf', 'NotoSansArabic-Regular.ttf']
+[PASS] shaping libraries importable
+[PASS] icon present
+[PASS] load PDF
+[PASS] insert Arabic+Latin - Text added successfully
+[PASS] save PDF
+[PASS] font embedded - ['Helvetica', 'DOLDMR+Noto Sans Arabic Regular', 'OSGDKI+Noto Sans Regular']
+[PASS] Arabic text layer logical - 'Self test original\nاختبار ذاتي NextPDF\n'
+[PASS] Arabic searchable
+[PASS] Arabic ink saved
+[PASS] reopen readable
+[PASS] signing works
+RESULT: PASS (0 failure(s))

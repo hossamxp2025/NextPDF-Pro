@@ -1,5 +1,5 @@
 NextPDF Pro
-Version: 1.6.2
-Build: 20261121-1119
-Status: feature release (digital signing with a PKCS#12 certificate, visible or invisible; no trusted timestamp and no revocation data, so not PAdES B-LT/LTA)
+Version: 1.6.3
+Build: 20261121-1336
+Status: fixes to how the signing dialog reads in Arabic; signing itself unchanged since 1.6.2 (no trusted timestamp and no revocation data, so not PAdES B-LT/LTA)
 Platform: Windows x64
