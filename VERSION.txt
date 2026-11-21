@@ -1,5 +1,5 @@
 NextPDF Pro
-Version: 1.6.3
-Build: 20261121-1336
-Status: fixes to how the signing dialog reads in Arabic; signing itself unchanged since 1.6.2 (no trusted timestamp and no revocation data, so not PAdES B-LT/LTA)
+Version: 1.6.4
+Build: 20261121-1609
+Status: fixes a sizing regression 1.6.3 introduced in the signing dialog; signing itself unchanged since 1.6.2 (no trusted timestamp and no revocation data, so not PAdES B-LT/LTA)
 Platform: Windows x64

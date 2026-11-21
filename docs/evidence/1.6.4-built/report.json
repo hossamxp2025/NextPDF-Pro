@@ -1,0 +1,333 @@
+{
+  "version": "1.6.4",
+  "frozen": true,
+  "executable": "C:\\Users\\DELL\\NextPDF-Pro\\dist\\release-1.6.4\\NextPDF-Pro.exe",
+  "checks": [
+    {
+      "name": "ar open no-table PDF",
+      "status": "PASS"
+    },
+    {
+      "name": "ar structured no_tables",
+      "status": "PASS"
+    },
+    {
+      "name": "ar localized message",
+      "status": "PASS"
+    },
+    {
+      "name": "ar no traceback in UI",
+      "status": "PASS"
+    },
+    {
+      "name": "ar main window alive",
+      "status": "PASS"
+    },
+    {
+      "name": "ar retry enabled",
+      "status": "PASS"
+    },
+    {
+      "name": "ar no XLSX published",
+      "status": "PASS"
+    },
+    {
+      "name": "ar open table PDF",
+      "status": "PASS"
+    },
+    {
+      "name": "ar success immediately after failure",
+      "status": "PASS"
+    },
+    {
+      "name": "ar logical Arabic cells",
+      "status": "PASS"
+    },
+    {
+      "name": "ar numeric value",
+      "status": "PASS"
+    },
+    {
+      "name": "ar Excel RTL",
+      "status": "PASS"
+    },
+    {
+      "name": "en open no-table PDF",
+      "status": "PASS"
+    },
+    {
+      "name": "en structured no_tables",
+      "status": "PASS"
+    },
+    {
+      "name": "en localized message",
+      "status": "PASS"
+    },
+    {
+      "name": "en no traceback in UI",
+      "status": "PASS"
+    },
+    {
+      "name": "en main window alive",
+      "status": "PASS"
+    },
+    {
+      "name": "en retry enabled",
+      "status": "PASS"
+    },
+    {
+      "name": "en no XLSX published",
+      "status": "PASS"
+    },
+    {
+      "name": "en open table PDF",
+      "status": "PASS"
+    },
+    {
+      "name": "en success immediately after failure",
+      "status": "PASS"
+    },
+    {
+      "name": "en logical Arabic cells",
+      "status": "PASS"
+    },
+    {
+      "name": "en numeric value",
+      "status": "PASS"
+    },
+    {
+      "name": "en Excel RTL",
+      "status": "PASS"
+    },
+    {
+      "name": "scanned table controlled refusal",
+      "status": "PASS"
+    },
+    {
+      "name": "bundled OCR subprocess",
+      "status": "PASS"
+    },
+    {
+      "name": "OCR English searchable",
+      "status": "PASS"
+    },
+    {
+      "name": "OCR Arabic searchable",
+      "status": "PASS"
+    },
+    {
+      "name": "sources unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "technical traceback logged",
+      "status": "PASS"
+    },
+    {
+      "name": "application icon loaded",
+      "status": "PASS"
+    },
+    {
+      "name": "bundled icon resource",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: plain file opens",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: saved with AES-256 and permissions",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: refused without the password",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: refusal says the file is encrypted",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: opens with the password",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: content readable after unlocking",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: an ordinary save keeps the encryption",
+      "status": "PASS"
+    },
+    {
+      "name": "protection: resaved file still needs the password",
+      "status": "PASS"
+    },
+    {
+      "name": "redaction: the marked area was applied",
+      "status": "PASS"
+    },
+    {
+      "name": "redaction: saved",
+      "status": "PASS"
+    },
+    {
+      "name": "redaction: the content is gone, not covered",
+      "status": "PASS"
+    },
+    {
+      "name": "redaction: the rest of the page survived",
+      "status": "PASS"
+    },
+    {
+      "name": "compression: ran and reported",
+      "status": "PASS"
+    },
+    {
+      "name": "compression: the reported sizes are the real ones",
+      "status": "PASS"
+    },
+    {
+      "name": "compression: never writes a bigger file",
+      "status": "PASS"
+    },
+    {
+      "name": "compression: the result still opens and keeps its page",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: highlight added",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: sticky note added",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: shape added",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: Arabic free text refused, with a reason",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: saved",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: all three read back from the saved file",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: the Arabic note text is stored as typed",
+      "status": "PASS"
+    },
+    {
+      "name": "comments: one can be deleted",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: text field created",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: a duplicate name is refused",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: a list without choices is refused",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: the Arabic value is stored",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: the broken appearance is declared, not hidden",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: saved",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: the saved file is a form",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: the value is exact after reopening",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: flattened, and the Arabic value was redrawn",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: the flattened file saved",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: the flattened value is real, shaped page text",
+      "status": "PASS"
+    },
+    {
+      "name": "forms: nothing fillable is left",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: the image was placed",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: the proportions were kept",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: the typed name was drawn",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: a stray click is refused",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: a missing image is refused",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: saved",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: the image is in the saved file",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: the Arabic name is real searchable text",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: a stamp is not an annotation and not a field",
+      "status": "PASS"
+    },
+    {
+      "name": "stamp: the white background was dropped, the stroke kept",
+      "status": "PASS"
+    },
+    {
+      "name": "conversion: Markdown written",
+      "status": "PASS"
+    },
+    {
+      "name": "conversion: the Markdown carries the page text",
+      "status": "PASS"
+    },
+    {
+      "name": "conversion: one numbered image file per page",
+      "status": "PASS"
+    }
+  ],
+  "original_customer_pdf": "Not provided",
+  "clean_machine": false
+}
