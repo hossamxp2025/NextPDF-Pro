@@ -1,0 +1,16 @@
+Checked outside NextPDF Pro, 2026-11-21, with test-signer.crt as the root.
+
+field_name         NextPDFSignature
+signer             NextPDF Pro Test Signer
+intact             True
+valid              True
+trusted            True
+covers_whole_file  True
+signed_at          2026-11-21 13:19:32+00:00
+reason             تجربة يدوية للتوقيع في 1.6.4
+location           الإسكندرية
+trust_problem      
+notes              ['No trusted timestamp: the signing time is the one the signer reported, not one a time authority confirmed']
+
+The stamp drawn on the page reads 2026-11-21 16:19:32 +03,
+and signed_at above is the same moment in UTC.
