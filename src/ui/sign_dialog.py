@@ -18,12 +18,54 @@ import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
     QCheckBox, QPushButton, QGroupBox, QComboBox, QSpinBox, QFileDialog,
-    QTextBrowser, QWidget,
+    QTextBrowser, QWidget, QSizePolicy,
 )
 
 from src.i18n import get_translator
 
 logger = logging.getLogger("NextPDF")
+
+#: Unicode isolates. Text between them keeps its own direction instead of
+#: taking the paragraph's, which matters wherever a run starts or ends with a
+#: neutral character: ".p12" in an Arabic line otherwise renders as "p12.",
+#: the dot having jumped to the other end. The same trick fixes the Android
+#: page counter, where "1 / 7" came out as "7 / 1".
+LTR_ISOLATE = "⁦"
+POP_ISOLATE = "⁩"
+
+
+def ltr(text: str) -> str:
+    """*text* kept left-to-right however the line around it runs."""
+    return f"{LTR_ISOLATE}{text}{POP_ISOLATE}"
+
+
+def format_signing_time(moment, zone=None) -> str:
+    """The signing time in local time, with its offset spelled out.
+
+    The stamp drawn on the page carries local time; the value stored in the
+    signature is UTC. Printing the stored value raw gave the report one clock
+    and the page another for the same signature, which reads as a fault in a
+    signature that is in fact sound. So both now say the same thing, and the
+    offset is shown so the reader is never left guessing which zone it is.
+
+    *zone* overrides the computer's own, which is what lets the formatting be
+    tested at an offset the machine running the tests does not happen to be in.
+    """
+    if moment is None:
+        return ""
+    if moment.tzinfo is None:
+        local = moment
+    else:
+        local = moment.astimezone(zone)
+    text = local.strftime("%Y-%m-%d %H:%M:%S")
+    offset = local.utcoffset()
+    if offset is None:
+        return text
+    total_minutes = int(offset.total_seconds()) // 60
+    sign = "-" if total_minutes < 0 else "+"
+    hours, minutes = divmod(abs(total_minutes), 60)
+    stamp = f"{sign}{hours:02d}" + (f":{minutes:02d}" if minutes else "")
+    return f"{text} {stamp}"
 
 #: Where a visible signature can be put, and the corner it is measured from.
 POSITIONS = (
@@ -39,6 +81,10 @@ DEFAULT_HEIGHT = 64
 
 #: Distance kept from the page edge, in points.
 MARGIN = 36
+
+#: Least width for the certificate path box, in pixels. It holds the longest
+#: value on the form, so it is not left to share a row on equal terms.
+CERTIFICATE_PATH_WIDTH = 280
 
 
 def placement_rect(position, page_width, page_height,
@@ -82,19 +128,29 @@ class SignDialog(QDialog):
 
         certificate_box = QGroupBox(tr("Certificate"))
         certificate_form = QFormLayout(certificate_box)
-        picker = QWidget()
+        picker = self.certificate_row = QWidget()
+        # Without this the row is only as wide as it needs to be, so the path
+        # box keeps its minimum while the plain text fields below stretch.
+        picker.setSizePolicy(QSizePolicy.Policy.Expanding,
+                             QSizePolicy.Policy.Preferred)
         picker_row = QHBoxLayout(picker)
         picker_row.setContentsMargins(0, 0, 0, 0)
         self.certificate_path = QLineEdit()
         self.certificate_path.setObjectName("certificate_path")
+        # The longest value in this dialog is a file path, so it gets the most
+        # room rather than the least: the label is short and the extensions
+        # moved into the placeholder, where they are also isolated so the dot
+        # stays in front of the extension in an Arabic layout.
+        self.certificate_path.setPlaceholderText(ltr(".p12 / .pfx"))
+        self.certificate_path.setMinimumWidth(CERTIFICATE_PATH_WIDTH)
         self.browse_button = QPushButton(tr("Browse"))
         self.browse_button.clicked.connect(self._browse)
-        picker_row.addWidget(self.certificate_path)
-        picker_row.addWidget(self.browse_button)
+        picker_row.addWidget(self.certificate_path, 1)
+        picker_row.addWidget(self.browse_button, 0)
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.Password)
         self.password.setObjectName("certificate_password")
-        certificate_form.addRow(tr("Certificate file (.p12 or .pfx)"), picker)
+        certificate_form.addRow(tr("Certificate file"), picker)
         certificate_form.addRow(tr("Certificate password"), self.password)
         self.check_button = QPushButton(tr("Check the certificate"))
         self.check_button.clicked.connect(self._check_certificate)
@@ -102,6 +158,13 @@ class SignDialog(QDialog):
         self.certificate_details = QLabel("")
         self.certificate_details.setWordWrap(True)
         self.certificate_details.setObjectName("certificate_details")
+        # A wrapped label in a form row is given the height of the text it
+        # held when the dialog was laid out, so a longer message - the wrong
+        # password one, say - was cut off mid-sentence with nothing to scroll.
+        details_policy = QSizePolicy(QSizePolicy.Policy.Preferred,
+                                     QSizePolicy.Policy.MinimumExpanding)
+        details_policy.setHeightForWidth(True)
+        self.certificate_details.setSizePolicy(details_policy)
         certificate_form.addRow(self.certificate_details)
         layout.addWidget(certificate_box)
 
@@ -159,6 +222,22 @@ class SignDialog(QDialog):
         self.page.setEnabled(checked)
         self.position.setEnabled(checked)
 
+    def _show_details(self, text):
+        """Put *text* under the certificate row and make room for it.
+
+        Without the resize the dialog keeps the height it was laid out with,
+        and anything longer than the first message is simply clipped.
+        """
+        label = self.certificate_details
+        label.setText(text)
+        # A size policy that honours heightForWidth is not enough on its own:
+        # the row keeps whatever height it already had until something asks
+        # for more. Asking explicitly is what stops the text being cut.
+        width = label.width() or label.sizeHint().width()
+        label.setMinimumHeight(label.heightForWidth(width) if text else 0)
+        label.updateGeometry()
+        self.adjustSize()
+
     def _browse(self):
         tr = self.tr_
         path, _ = QFileDialog.getOpenFileName(
@@ -166,7 +245,7 @@ class SignDialog(QDialog):
             f"{tr('Certificate files')} (*.p12 *.pfx)")
         if path:
             self.certificate_path.setText(path)
-            self.certificate_details.setText("")
+            self._show_details("")
 
     def _check_certificate(self):
         """Read the certificate now, so a wrong password is caught here."""
@@ -175,18 +254,24 @@ class SignDialog(QDialog):
         tr = self.tr_
         path = self.certificate_path.text().strip()
         if not path:
-            self.certificate_details.setText(tr("Choose a certificate file first."))
+            self._show_details(tr("Choose a certificate file first."))
             return
         try:
             details = describe_certificate(path, self.password.text())
         except SigningError as error:
-            self.certificate_details.setText(str(error))
+            # The engine raises its message in English, which is this
+            # project's translation key, so it is translated here rather
+            # than shown raw in the middle of an Arabic dialog.
+            self._show_details(tr(str(error)))
             return
         lines = [f"{tr('Signer')}: {details['subject']}",
                  f"{tr('Issued by')}: {details['issuer']}"]
         if details["valid_until"]:
+            # Isolated for the same reason as the extensions: the hyphens are
+            # neutral, so "2036-11-16" was being drawn as "16-11-2036" - a
+            # different, plausible-looking date rather than obvious nonsense.
             lines.append(f"{tr('Valid until')}: "
-                         f"{details['valid_until'].strftime('%Y-%m-%d')}")
+                         f"{ltr(details['valid_until'].strftime('%Y-%m-%d'))}")
         if details["expired"]:
             lines.append(tr("This certificate has expired."))
         if details["self_signed"]:
@@ -195,7 +280,7 @@ class SignDialog(QDialog):
                 "it. A signature made with it still proves the file has not "
                 "changed, but a reader has no way to confirm who made it "
                 "unless you give them this certificate yourself."))
-        self.certificate_details.setText("\n".join(lines))
+        self._show_details("\n".join(lines))
 
     def validation_error(self):
         """The reason the signature cannot be made, or None."""
@@ -247,7 +332,7 @@ def report_text(reports, tr) -> str:
         lines.append(f"{tr('Signer')}: {report.signer or tr('not stated')}")
         if report.signed_at:
             lines.append(f"{tr('Signed at')}: "
-                         f"{report.signed_at.strftime('%Y-%m-%d %H:%M')} "
+                         f"{ltr(format_signing_time(report.signed_at))} "
                          f"({tr('the time the signer claims, not a verified one')})")
         if report.unchanged_since_signing:
             lines.append(tr("The file has not changed since it was signed."))
@@ -262,13 +347,20 @@ def report_text(reports, tr) -> str:
             lines.append(tr("The signer is not confirmed: no authority this "
                             "computer trusts vouches for the certificate."))
             if report.trust_problem:
-                lines.append(f"{tr('Reason')}: {report.trust_problem}")
+                # Not "Reason": that word is two lines below for the reason
+                # the signer typed, and one word for two different things in
+                # the same short report is how a reader ends up misreading it.
+                lines.append(f"{tr('Why the signer is not confirmed')}: "
+                             f"{tr(report.trust_problem)}")
         if report.reason:
             lines.append(f"{tr('Reason given')}: {report.reason}")
         if report.location:
             lines.append(f"{tr('Place given')}: {report.location}")
         for note in report.notes:
-            lines.append(f"• {note}")
+            # The engine writes its notes in English, which is the translation
+            # key here; anything it passes through from pyHanko has no entry
+            # and falls back to the key, so it stays readable either way.
+            lines.append(f"• {tr(note)}")
         blocks.append("<br>".join(lines))
     return "<br><br>".join(blocks)
 

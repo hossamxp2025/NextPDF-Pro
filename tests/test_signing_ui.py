@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 import pymupdf as fitz
 
@@ -25,8 +26,10 @@ from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QMessageBox
 from src.engine.signing import SignatureReport, verify_document
 from src.i18n import get_translator
 from src.ui.main_window import MainWindow
-from src.ui.sign_dialog import (DEFAULT_HEIGHT, DEFAULT_WIDTH, MARGIN,
-                                SignDialog, placement_rect, report_text)
+from src.ui.sign_dialog import (CERTIFICATE_PATH_WIDTH, DEFAULT_HEIGHT,
+                                DEFAULT_WIDTH, LTR_ISOLATE, MARGIN,
+                                POP_ISOLATE, SignDialog, format_signing_time,
+                                ltr, placement_rect, report_text)
 
 CERT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "certificates")
 P12 = os.path.join(CERT_DIR, "test-signer.p12")
@@ -109,6 +112,168 @@ class ReportWordingTests(unittest.TestCase):
         text = report_text([self.report(trusted=True)], self.tr)
         self.assertIn("trusted on this computer", text)
         self.assertNotIn("not confirmed", text)
+
+    def test_the_trust_problem_is_not_labelled_the_same_as_the_stated_reason(self):
+        """One word for two meanings in one short report misleads the reader."""
+        text = report_text([self.report(
+            trust_problem="No trusted certificates were supplied, so nothing "
+                          "can be said about who signed this",
+            reason="A stated reason")], self.tr)
+        self.assertIn("Why the signer is not confirmed", text)
+        self.assertIn("Reason given", text)
+        self.assertNotIn("<br>Reason:", text)
+
+    def test_the_engine_sentences_are_translated_not_printed_raw(self):
+        """They are English in the engine, and English is the key here."""
+        get_translator().set_language("ar")
+        try:
+            text = report_text([self.report(
+                trust_problem="No trusted certificates were supplied, so "
+                              "nothing can be said about who signed this",
+                notes=["No trusted timestamp: the signing time is the one the "
+                       "signer reported, not one a time authority confirmed"])],
+                get_translator().tr)
+        finally:
+            get_translator().set_language("en")
+        self.assertNotIn("No trusted certificates", text)
+        self.assertNotIn("No trusted timestamp", text)
+        self.assertIn("لم تُسلَّم", text)
+        self.assertIn("لا ختم زمني موثوق", text)
+
+    def test_a_sentence_with_no_translation_still_reads(self):
+        """pyHanko's own wording has no entry; falling back to it is correct."""
+        text = report_text([self.report(trust_problem="Something pyHanko said")],
+                           self.tr)
+        self.assertIn("Something pyHanko said", text)
+
+
+class SigningTimeTests(unittest.TestCase):
+    """The report and the stamp on the page must name the same moment.
+
+    They did not: the stamp drew local time and the report printed the stored
+    UTC value with no zone on it, so one signature appeared to carry two
+    different times. The signature was sound; only the reading of it was not.
+    """
+
+    def test_a_utc_time_is_shown_in_local_time_with_its_offset(self):
+        moment = datetime(2026, 11, 21, 9, 59, 46, tzinfo=timezone.utc)
+        shown = format_signing_time(moment)
+        self.assertRegex(shown, r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{2}")
+
+    def test_the_instant_survives_the_formatting(self):
+        moment = datetime(2026, 11, 21, 9, 59, 46, tzinfo=timezone.utc)
+        shown = format_signing_time(moment)
+        stamp = shown[-6:] if ":" in shown[-6:] else shown[-3:]
+        body = shown[: -len(stamp)].strip()
+        hours, _, minutes = stamp.lstrip("+-").partition(":")
+        delta = timedelta(hours=int(hours), minutes=int(minutes or 0))
+        if stamp.startswith("-"):
+            delta = -delta
+        local = datetime.strptime(body, "%Y-%m-%d %H:%M:%S")
+        self.assertEqual(local - delta, moment.replace(tzinfo=None))
+
+    def test_an_hour_offset_is_not_padded_with_empty_minutes(self):
+        moment = datetime(2026, 11, 21, 6, 0, tzinfo=timezone.utc)
+        shown = format_signing_time(moment, timezone(timedelta(hours=3)))
+        self.assertEqual(shown, "2026-11-21 09:00:00 +03")
+
+    def test_half_hour_offsets_keep_their_minutes(self):
+        moment = datetime(2026, 11, 21, 6, 0, tzinfo=timezone.utc)
+        shown = format_signing_time(moment, timezone(timedelta(hours=5, minutes=30)))
+        self.assertEqual(shown, "2026-11-21 11:30:00 +05:30")
+
+    def test_a_zone_behind_utc_keeps_its_sign(self):
+        moment = datetime(2026, 11, 21, 6, 0, tzinfo=timezone.utc)
+        shown = format_signing_time(moment, timezone(-timedelta(hours=4)))
+        self.assertEqual(shown, "2026-11-21 02:00:00 -04")
+
+    def test_no_time_gives_no_text(self):
+        self.assertEqual(format_signing_time(None), "")
+
+
+class DirectionTests(unittest.TestCase):
+    """A dot is a neutral character and drifts to the wrong end in Arabic."""
+
+    def test_isolated_text_is_wrapped_in_both_marks(self):
+        self.assertEqual(ltr(".p12"), LTR_ISOLATE + ".p12" + POP_ISOLATE)
+
+    def test_the_extension_hint_is_isolated_and_out_of_the_label(self):
+        dialog = SignDialog()
+        hint = dialog.certificate_path.placeholderText()
+        self.assertIn(".p12", hint)
+        self.assertTrue(hint.startswith(LTR_ISOLATE), repr(hint))
+        self.assertTrue(hint.endswith(POP_ISOLATE), repr(hint))
+        dialog.deleteLater()
+
+    @unittest.skipUnless(os.path.isfile(P12), "no test certificate")
+    def test_the_expiry_date_is_isolated_so_it_is_not_read_backwards(self):
+        """"2036-11-16" was drawn as "16-11-2036": a different, believable date."""
+        dialog = SignDialog()
+        dialog.certificate_path.setText(P12)
+        dialog.password.setText(PASSWORD)
+        dialog._check_certificate()
+        details = dialog.certificate_details.text()
+        for line in details.splitlines():
+            if any(ch.isdigit() for ch in line) and "-" in line:
+                self.assertIn(LTR_ISOLATE, line, line)
+        dialog.deleteLater()
+
+    def test_the_signing_time_is_isolated_in_the_report(self):
+        report = SignatureReport(
+            field_name="F", signer="S", intact=True, valid=True, trusted=False,
+            covers_whole_file=True,
+            signed_at=datetime(2026, 11, 21, 9, 59, 46, tzinfo=timezone.utc))
+        text = report_text([report], get_translator().tr)
+        self.assertIn(LTR_ISOLATE, text)
+
+
+class LayoutTests(unittest.TestCase):
+    """Found by using the dialog, not by asserting on behaviour."""
+
+    def setUp(self):
+        app()
+
+    def test_the_path_box_is_not_the_narrowest_field_on_the_form(self):
+        """It was ~86px while the free-text fields were ~185.
+
+        It shares its row with the Browse button, so it cannot be as wide as
+        a field that has a row to itself; what it must do is take everything
+        the button leaves, instead of being squeezed by a long label.
+        """
+        dialog = SignDialog()
+        dialog.show()
+        app().processEvents()
+        try:
+            path = dialog.certificate_path.width()
+            self.assertGreaterEqual(dialog.certificate_path.minimumWidth(),
+                                    CERTIFICATE_PATH_WIDTH)
+            self.assertGreater(path, dialog.browse_button.width())
+            # Its row is a column of the same form, so it is as wide as the
+            # password row; the button is what it shares that width with.
+            self.assertEqual(dialog.certificate_row.width(),
+                             dialog.password.width())
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+
+    @unittest.skipUnless(os.path.isfile(P12), "no test certificate")
+    def test_a_long_message_makes_the_dialog_taller_instead_of_being_cut(self):
+        dialog = SignDialog()
+        dialog.show()
+        try:
+            short = dialog.height()
+            dialog.certificate_path.setText(P12)
+            dialog.password.setText("wrong")
+            dialog._check_certificate()
+            message = dialog.certificate_details.text()
+            self.assertGreater(len(message), 80, message)
+            self.assertGreaterEqual(dialog.height(), short)
+            needed = dialog.certificate_details.heightForWidth(
+                dialog.certificate_details.width())
+            self.assertGreaterEqual(dialog.certificate_details.height(), needed)
+        finally:
+            dialog.close()
+            dialog.deleteLater()
 
 
 class SignDialogTests(unittest.TestCase):

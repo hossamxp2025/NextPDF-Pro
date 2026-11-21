@@ -452,7 +452,7 @@ TRANSLATIONS = {
             "يُضاف التوقيع الرقمي إلى نسخة جديدة من الملف، وهذا المستند يبقى كما هو. والتوقيع يتيح لأي قارئ أن يثبت أن الملف لم يتغير منذ توقيعه. أما أن يقتنع القارئ بأنك أنت من وقّع فذلك يعتمد على ثقته في شهادتك.",
         "Certificate": "الشهادة",
         "Browse": "استعراض",
-        "Certificate file (.p12 or .pfx)": "ملف الشهادة (.p12 أو .pfx)",
+        "Certificate file": "ملف الشهادة",
         "Certificate password": "كلمة مرور الشهادة",
         "Check the certificate": "فحص الشهادة",
         "What the signature records": "ما يسجّله التوقيع",
@@ -492,6 +492,21 @@ TRANSLATIONS = {
         "The signer is not confirmed: no authority this computer trusts vouches for the certificate.":
             "هوية الموقِّع غير مؤكَّدة: لا توجد جهة يثق بها هذا الجهاز تشهد للشهادة.",
         "Reason given": "السبب المذكور",
+        "Why the signer is not confirmed": "سبب عدم تأكيد الهوية",
+        # Sentences the engine writes. English is the key here as everywhere,
+        # so the report reads as Arabic instead of switching language halfway.
+        "No trusted certificates were supplied, so nothing can be said about who signed this":
+            "لم تُسلَّم أي شهادات موثوقة، فلا يمكن قول شيء عمّن وقّع هذا الملف",
+        "No trusted timestamp: the signing time is the one the signer reported, not one a time authority confirmed":
+            "لا ختم زمني موثوق: وقت التوقيع هو ما أبلغ به الموقِّع، لا وقت أكّدته سلطة توقيت",
+        "The signer's certificate is not trusted here":
+            "شهادة الموقِّع غير موثوقة هنا",
+        "This signature could not be checked at all": "تعذّر فحص هذا التوقيع أصلًا",
+        "The signature is present but could not be read": "التوقيع موجود لكن تعذّرت قراءته",
+        "Something was added to the file after this signature was made; the signature covers only the part of the file up to that point":
+            "أُضيف شيء إلى الملف بعد هذا التوقيع، والتوقيع يشمل الجزء السابق لتلك النقطة فقط",
+        "No signing key could be read from the certificate. The password is probably wrong, or the file is not a PKCS#12 certificate with a private key in it.":
+            "تعذّرت قراءة مفتاح توقيع من الشهادة. الأرجح أن كلمة المرور غير صحيحة، أو أن الملف ليس شهادة PKCS#12 تحمل مفتاحًا خاصًا.",
         "Place given": "المكان المذكور",
         "A digital signature does two separate things, and they are worth keeping apart.\n\nFirst, it lets any reader prove the file has not changed since it was signed. That part is arithmetic: it either holds or it does not, and nobody's opinion enters into it.\n\nSecond, it carries a certificate that claims who signed. That claim is worth something only to a reader who trusts the certificate. A certificate you made yourself proves nothing to anyone else until you give it to them by some other means they trust.\n\nWhat this program does not do: it does not add a timestamp from a time authority, so the signing time recorded is the one your computer reported and is not evidence of when you signed. It does not embed revocation data either, so a reader cannot check later whether the certificate was withdrawn.":
             "التوقيع الرقمي يفعل أمرين منفصلين، ويستحقان أن يُفرَّق بينهما.\n\nالأول: يتيح لأي قارئ أن يثبت أن الملف لم يتغير منذ توقيعه. وهذا الجزء حساب رياضي: إما يصح وإما لا، ولا يدخل فيه رأي أحد.\n\nالثاني: يحمل شهادة تدّعي من الذي وقّع. وهذا الادعاء لا قيمة له إلا عند قارئ يثق في الشهادة. والشهادة التي تصنعها بنفسك لا تثبت شيئًا لأحد غيرك حتى تسلّمها له بوسيلة أخرى يثق بها.\n\nوما لا يفعله هذا البرنامج: لا يضيف ختمًا زمنيًا من سلطة توقيت، فوقت التوقيع المسجَّل هو ما أبلغ به جهازك وليس دليلًا على وقت توقيعك. ولا يضمّن بيانات سحب الشهادة، فلا يستطيع القارئ أن يتحقق لاحقًا مما إذا كانت الشهادة قد سُحبت.",
