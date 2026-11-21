@@ -145,6 +145,12 @@ class SignDialog(QDialog):
         self.certificate_path.setMinimumWidth(CERTIFICATE_PATH_WIDTH)
         self.browse_button = QPushButton(tr("Browse"))
         self.browse_button.clicked.connect(self._browse)
+        # The path box asks for a minimum of its own, so while the dialog is
+        # briefly narrower than the two of them together the layout has to take
+        # the difference out of one. Left alone it takes it out of the button
+        # and clips the label; pinning the button at the width of its own text
+        # sends the squeeze to the path box, where text scrolls instead of
+        # disappearing.
         picker_row.addWidget(self.certificate_path, 1)
         picker_row.addWidget(self.browse_button, 0)
         self.password = QLineEdit()
@@ -236,7 +242,12 @@ class SignDialog(QDialog):
         width = label.width() or label.sizeHint().width()
         label.setMinimumHeight(label.heightForWidth(width) if text else 0)
         label.updateGeometry()
-        self.adjustSize()
+        # adjustSize() would also pull the width back to the hint, throwing
+        # away any width the reader had given the dialog and reflowing the
+        # certificate row on the way - which is where the Browse button was
+        # seen squeezed and its label cut. Only the height needs to change.
+        self.resize(max(self.width(), self.sizeHint().width()),
+                    self.sizeHint().height())
 
     def _browse(self):
         tr = self.tr_

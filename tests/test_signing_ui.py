@@ -257,6 +257,34 @@ class LayoutTests(unittest.TestCase):
             dialog.deleteLater()
 
     @unittest.skipUnless(os.path.isfile(P12), "no test certificate")
+    def test_a_message_does_not_take_back_a_width_the_reader_chose(self):
+        """What was behind the Browse button seen clipped in 1.6.3.
+
+        Making room for the message was done with adjustSize(), which sets
+        both dimensions to the hint: a dialog widened to 760 snapped back to
+        506 the moment a message appeared, and the certificate row reflowed
+        on the way. Only the height has any reason to change.
+        """
+        dialog = SignDialog()
+        dialog.show()
+        app().processEvents()
+        try:
+            dialog.resize(760, dialog.height())
+            app().processEvents()
+            wide, tall = dialog.width(), dialog.height()
+            dialog.certificate_path.setText(P12)
+            dialog.password.setText("wrong")
+            dialog._check_certificate()
+            app().processEvents()
+            self.assertEqual(dialog.width(), wide)
+            self.assertGreater(dialog.height(), tall)
+            self.assertGreaterEqual(dialog.browse_button.width(),
+                                    dialog.browse_button.sizeHint().width())
+        finally:
+            dialog.close()
+            dialog.deleteLater()
+
+    @unittest.skipUnless(os.path.isfile(P12), "no test certificate")
     def test_a_long_message_makes_the_dialog_taller_instead_of_being_cut(self):
         dialog = SignDialog()
         dialog.show()
